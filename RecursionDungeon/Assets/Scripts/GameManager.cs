@@ -5,7 +5,7 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    public enum GameState { MainMenu, Playing, Won }
+    public enum GameState { MainMenu, Playing, Won, Lost }
 
     [Header("State")]
     private GameState currentState = GameState.Playing;
@@ -34,12 +34,28 @@ public class GameManager : MonoBehaviour
 
     public void WinGame()
     {
+        if (currentState != GameState.Playing) return;
         currentState = GameState.Won;
+
+        BombTimer.Instance?.StopBomb();
 
         PlayerController pc = FindFirstObjectByType<PlayerController>();
         if (pc != null) pc.SetCanMove(false);
 
         UIManager.Instance?.ShowVictoryScreen(gameTimer);
+    }
+
+    public void LoseGame(string reason)
+    {
+        if (currentState != GameState.Playing) return;
+        currentState = GameState.Lost;
+
+        BombTimer.Instance?.StopBomb();
+
+        PlayerController pc = FindFirstObjectByType<PlayerController>();
+        if (pc != null) pc.SetCanMove(false);
+
+        UIManager.Instance?.ShowGameOverScreen(reason);
     }
 
     public void ReturnToMainMenu()

@@ -456,6 +456,11 @@ public class RecursionDungeonSetup : EditorWindow
         gm.transform.SetParent(managers.transform);
         gm.AddComponent<GameManager>();
 
+        GameObject bt = new GameObject("BombTimer");
+        bt.transform.SetParent(managers.transform);
+        BombTimer bomb = bt.AddComponent<BombTimer>();
+        bomb.fuseSeconds = 20f;
+
         GameObject rm = new GameObject("RoomManager");
         rm.transform.SetParent(managers.transform);
         RoomManager roomMgr = rm.AddComponent<RoomManager>();
@@ -650,6 +655,105 @@ public class RecursionDungeonSetup : EditorWindow
         uiMgr.playAgainButton = playAgainBtn.GetComponent<Button>();
         uiMgr.mainMenuButton = mainMenuBtn.GetComponent<Button>();
         victoryPanel.SetActive(false);
+
+        // ── BOMB TIMER PANEL (top-center, below the main timer) ──
+        Color bombBorder = new Color(1f, 0.3f, 0.1f);
+        Color bombBody = new Color(0.12f, 0.04f, 0.06f, 0.95f);
+
+        GameObject bombPanel = CreatePixelPanel("BombPanel", canvasGO.transform,
+            new Vector2(0.5f, 1), new Vector2(0, -80), new Vector2(360, 120),
+            bombBody, bombBorder);
+        bombPanel.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1);
+        AddPixelBorder(bombPanel, bombBorder, 3);
+
+        GameObject bombLabel = CreatePixelText("BombLabel", bombPanel.transform,
+            "▼  BOMB TIMER  ▼",
+            18, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(340, 28),
+            new Color(1f, 0.55f, 0.15f));
+        RectTransform blRT = bombLabel.GetComponent<RectTransform>();
+        blRT.anchorMin = new Vector2(0, 1); blRT.anchorMax = new Vector2(1, 1);
+        blRT.pivot = new Vector2(0.5f, 1);
+        blRT.anchoredPosition = new Vector2(0, -6);
+        blRT.sizeDelta = new Vector2(-10, 26);
+
+        GameObject bombTimer = CreatePixelText("BombTimerText", bombPanel.transform,
+            "20.00",
+            52, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(340, 70),
+            new Color(1f, 0.85f, 0.25f));
+        RectTransform btRT = bombTimer.GetComponent<RectTransform>();
+        btRT.anchorMin = new Vector2(0, 0.5f); btRT.anchorMax = new Vector2(1, 0.5f);
+        btRT.pivot = new Vector2(0.5f, 0.5f);
+        btRT.anchoredPosition = new Vector2(0, 2);
+        btRT.sizeDelta = new Vector2(-10, 70);
+
+        // Fuse bar background (dark)
+        GameObject fuseBG = CreateUIImage("FuseBarBG", bombPanel.transform,
+            new Color(0.08f, 0.02f, 0.02f, 1f));
+        RectTransform fuseBGRT = fuseBG.GetComponent<RectTransform>();
+        fuseBGRT.anchorMin = new Vector2(0, 0); fuseBGRT.anchorMax = new Vector2(1, 0);
+        fuseBGRT.pivot = new Vector2(0.5f, 0);
+        fuseBGRT.anchoredPosition = new Vector2(0, 8);
+        fuseBGRT.sizeDelta = new Vector2(-24, 12);
+
+        // Fuse bar fill (the actual countdown bar)
+        GameObject fuseBar = CreateUIImage("FuseBarFill", fuseBG.transform,
+            new Color(1f, 0.55f, 0.1f));
+        RectTransform fuseBarRT = fuseBar.GetComponent<RectTransform>();
+        fuseBarRT.anchorMin = new Vector2(0, 0); fuseBarRT.anchorMax = new Vector2(1, 1);
+        fuseBarRT.offsetMin = new Vector2(2, 2); fuseBarRT.offsetMax = new Vector2(-2, -2);
+        Image fuseBarImg = fuseBar.GetComponent<Image>();
+        fuseBarImg.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+        fuseBarImg.type = Image.Type.Filled;
+        fuseBarImg.fillMethod = Image.FillMethod.Horizontal;
+        fuseBarImg.fillOrigin = (int)Image.OriginHorizontal.Left;
+        fuseBarImg.fillAmount = 1f;
+
+        uiMgr.bombPanel = bombPanel;
+        uiMgr.bombTimerText = bombTimer.GetComponent<Text>();
+        uiMgr.bombLabelText = bombLabel.GetComponent<Text>();
+        uiMgr.bombFuseBar = fuseBarImg;
+        uiMgr.bombPanelBackground = bombPanel.transform.Find("Body").GetComponent<Image>();
+        bombPanel.SetActive(false);
+
+        // ── GAME OVER PANEL ──
+        GameObject gameOverPanel = CreatePixelPanel("GameOverPanel", canvasGO.transform,
+            new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(680, 460),
+            new Color(0.10f, 0.03f, 0.05f, 0.98f), C_ACCENT_RED);
+        gameOverPanel.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 0.5f);
+        AddPixelBorder(gameOverPanel, C_ACCENT_RED, 5);
+
+        CreatePixelText("GOTitle", gameOverPanel.transform, "☠  DEFEAT  ☠",
+            54, TextAnchor.MiddleCenter, new Vector2(0, 155), new Vector2(640, 80), C_ACCENT_RED);
+
+        CreatePixelText("GOBoom", gameOverPanel.transform, "✹  B O O M  ✹",
+            32, TextAnchor.MiddleCenter, new Vector2(0, 90), new Vector2(640, 50),
+            new Color(1f, 0.55f, 0.15f));
+
+        GameObject goReason = CreatePixelText("GOReason", gameOverPanel.transform,
+            "THE BOMB EXPLODED!",
+            22, TextAnchor.MiddleCenter, new Vector2(0, 40), new Vector2(640, 40), Color.white);
+
+        CreatePixelText("GOTip", gameOverPanel.transform,
+            "The Dagger armed a 20-second fuse.\nEscape the recursion faster next time!",
+            17, TextAnchor.MiddleCenter, new Vector2(0, -15), new Vector2(620, 70), C_TEXT_DIM);
+
+        GameObject goRestartBtn = CreatePixelButton("GORestartButton", gameOverPanel.transform,
+            "TRY AGAIN  [R]", new Vector2(-130, -110), new Vector2(240, 60),
+            new Color(0.5f, 0.15f, 0.2f), C_ACCENT_RED);
+
+        GameObject goMenuBtn = CreatePixelButton("GOMenuButton", gameOverPanel.transform,
+            "MAIN MENU  [M]", new Vector2(130, -110), new Vector2(240, 60),
+            new Color(0.15f, 0.15f, 0.4f), C_ACCENT_CYAN);
+
+        CreatePixelText("GOHint", gameOverPanel.transform,
+            "Press R to retry  ·  M for main menu",
+            15, TextAnchor.MiddleCenter, new Vector2(0, -180), new Vector2(560, 25), C_TEXT_DIM);
+
+        uiMgr.gameOverPanel = gameOverPanel;
+        uiMgr.gameOverReasonText = goReason.GetComponent<Text>();
+        uiMgr.gameOverRestartButton = goRestartBtn.GetComponent<Button>();
+        uiMgr.gameOverMenuButton = goMenuBtn.GetComponent<Button>();
+        gameOverPanel.SetActive(false);
     }
 
     // ═══════════════════════════════════════════════════
