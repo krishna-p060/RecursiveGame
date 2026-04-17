@@ -68,6 +68,7 @@ public class Monster : MonoBehaviour
     IEnumerator DeathAnimation()
     {
         UIManager.Instance?.ShowDialog($"{monsterName} defeated!");
+        AudioManager.Instance?.Play(AudioManager.SFX_MONSTER_DEATH);
 
         float duration = 0.6f;
         float elapsed = 0f;

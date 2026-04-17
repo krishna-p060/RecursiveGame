@@ -36,6 +36,7 @@ public class PlayerInventory : MonoBehaviour
 
         UIManager.Instance?.UpdateWeaponDisplay(weaponName, weaponColor);
         UIManager.Instance?.ShowDialog($"Picked up: {weaponName}");
+        AudioManager.Instance?.Play(AudioManager.SFX_WEAPON_PICKUP);
 
         // Reaching the base case arms a bomb — player must now race back up and escape.
         if (weaponName == "Dagger" && BombTimer.Instance != null && !BombTimer.Instance.IsActive)

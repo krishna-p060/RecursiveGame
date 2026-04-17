@@ -14,6 +14,7 @@ public class BombTimer : MonoBehaviour
 
     private float timeRemaining = 0f;
     private bool active = false;
+    private int lastTickedSecond = -1;
 
     public bool IsActive => active;
     public float TimeRemaining => timeRemaining;
@@ -31,7 +32,9 @@ public class BombTimer : MonoBehaviour
         if (active) return;
         timeRemaining = overrideSeconds ?? fuseSeconds;
         active = true;
+        lastTickedSecond = Mathf.CeilToInt(timeRemaining);
         UIManager.Instance?.ShowBombTimer(timeRemaining);
+        AudioManager.Instance?.Play(AudioManager.SFX_BOMB_ARMED);
     }
 
     /// <summary>Defuse the bomb (call this when the player wins or the game ends).</summary>
@@ -50,6 +53,15 @@ public class BombTimer : MonoBehaviour
         timeRemaining -= Time.deltaTime;
         UIManager.Instance?.UpdateBombTimer(timeRemaining, fuseSeconds);
 
+        // Tick sound — one click per whole second remaining, louder when nearly out.
+        int currentSecond = Mathf.CeilToInt(timeRemaining);
+        if (currentSecond != lastTickedSecond && currentSecond > 0)
+        {
+            lastTickedSecond = currentSecond;
+            float tickVolume = timeRemaining < 3f ? 1.2f : 0.7f;
+            AudioManager.Instance?.Play(AudioManager.SFX_BOMB_TICK, tickVolume);
+        }
+
         if (timeRemaining <= 0f)
         {
             timeRemaining = 0f;
@@ -62,6 +74,7 @@ public class BombTimer : MonoBehaviour
     {
         UIManager.Instance?.UpdateBombTimer(0f, fuseSeconds);
         UIManager.Instance?.HideBombTimer();
+        AudioManager.Instance?.Play(AudioManager.SFX_BOMB_EXPLODE, 1.3f);
         GameManager.Instance?.LoseGame("THE BOMB EXPLODED!");
     }
 }

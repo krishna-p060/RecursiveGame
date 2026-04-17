@@ -461,6 +461,10 @@ public class RecursionDungeonSetup : EditorWindow
         BombTimer bomb = bt.AddComponent<BombTimer>();
         bomb.fuseSeconds = 20f;
 
+        GameObject am = new GameObject("AudioManager");
+        am.transform.SetParent(managers.transform);
+        am.AddComponent<AudioManager>();
+
         GameObject rm = new GameObject("RoomManager");
         rm.transform.SetParent(managers.transform);
         RoomManager roomMgr = rm.AddComponent<RoomManager>();
