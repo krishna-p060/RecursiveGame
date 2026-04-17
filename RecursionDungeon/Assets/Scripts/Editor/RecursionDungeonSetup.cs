@@ -310,73 +310,137 @@ public class RecursionDungeonSetup : EditorWindow
     };
 
     // Maze design principle:
-    //   - 3 horizontal walls in a ZIGZAG pattern (gap alternates: RIGHT, LEFT, RIGHT)
-    //   - Every gap is at least 3.5 units wide (player is only 0.75 units)
-    //   - Corridor between walls is at least 2 units tall (fits monsters)
-    //   - Entry is at bottom-LEFT corner, door at TOP-CENTER
-    //   - Player path: go UP → RIGHT gap → UP → LEFT gap → UP → RIGHT gap → DOOR
+    //   - Horizontal walls create a zigzag skeleton with alternating gaps (R/L/R)
+    //   - Vertical wall segments inside corridors force ADDITIONAL turns & decisions
+    //   - Dead-end branches trick the player into wrong paths
+    //   - Monsters live in side pockets off the main traversal route
+    //   - Walls are thin (t=0.5) so corridors feel spacious
+    //   - Deeper rooms have MORE internal walls (harder mazes)
     static void BuildMazeFor(int depth, Transform parent, float half, Color wallColor)
     {
         Color mazeColor = MAZE_COLORS[depth];
-        float t = 1.0f;
+        float t = 0.5f; // thin walls → more playable space
 
+        // Horizontal walls slide horizontally → the gap shifts left/right over time,
+        // so player must time their move when the gap aligns with them.
         if (depth == 0)
         {
-            // Grand Hall (14x14). 3 walls, each 10 wide, leaves 3.5-unit gap.
-            // Wall1 covers left (gap right) | Wall2 covers right (gap left) | Wall3 covers left (gap right)
-            AddMazeWall(parent, new Vector3(-2f, -3f,  0), new Vector3(10f, t, 1), mazeColor); // gap RIGHT
-            AddMazeWall(parent, new Vector3( 2f,  0.5f,0), new Vector3(10f, t, 1), mazeColor); // gap LEFT
-            AddMazeWall(parent, new Vector3(-2f,  4f,  0), new Vector3(10f, t, 1), mazeColor); // gap RIGHT
+            // ─── GRAND HALL (14×14) ─── intro: H1 static, upper walls + posts moving
+            AddMazeWall(parent, new Vector3(-2f, -3f, 0), new Vector3(10f, t, 1), mazeColor); // H1 static (safe entry)
+            AddMovingMazeWall(parent, new Vector3(2f, 0.5f, 0), new Vector3(10f, t, 1),
+                MovingWall.MoveAxis.Horizontal, 2f, 0.9f);                              // H2 sliding
+            AddMovingMazeWall(parent, new Vector3(-2f, 4f, 0), new Vector3(10f, t, 1),
+                MovingWall.MoveAxis.Horizontal, 2f, 0.9f, Mathf.PI);                    // H3 sliding (opposite phase)
+            AddMazeWall(parent, new Vector3(0f, -1.25f, 0), new Vector3(t, 1.5f, 1), mazeColor); // V1 static post
+            AddMovingMazeWall(parent, new Vector3(0f, 2.25f, 0), new Vector3(t, 1.5f, 1),
+                MovingWall.MoveAxis.Horizontal, 3f, 1.3f);                              // V2 sliding post
         }
         else if (depth == 1)
         {
-            // Dark Cave (12x12). 3 walls, 8 wide, ~3-unit gap.
-            AddMazeWall(parent, new Vector3(-1.5f, -2.5f, 0), new Vector3(8f, t, 1), mazeColor); // gap RIGHT
-            AddMazeWall(parent, new Vector3( 1.5f,  0f,   0), new Vector3(8f, t, 1), mazeColor); // gap LEFT
-            AddMazeWall(parent, new Vector3(-1.5f,  2.5f, 0), new Vector3(8f, t, 1), mazeColor); // gap RIGHT
+            // ─── DARK CAVE (12×12) ─── every horizontal wall slides, plus 2 moving posts
+            AddMovingMazeWall(parent, new Vector3(-1.5f, -2.5f, 0), new Vector3(8f, t, 1),
+                MovingWall.MoveAxis.Horizontal, 1.8f, 1.0f);                            // H1 sliding
+            AddMovingMazeWall(parent, new Vector3(1.5f, 0f, 0), new Vector3(8f, t, 1),
+                MovingWall.MoveAxis.Horizontal, 1.8f, 1.0f, Mathf.PI);                  // H2 sliding (opposite)
+            AddMovingMazeWall(parent, new Vector3(-1.5f, 2.5f, 0), new Vector3(8f, t, 1),
+                MovingWall.MoveAxis.Horizontal, 1.8f, 1.0f);                            // H3 sliding
+            // Moving posts out of phase
+            AddMovingMazeWall(parent, new Vector3(-0.5f, -1.25f, 0), new Vector3(t, 1.5f, 1),
+                MovingWall.MoveAxis.Horizontal, 2.5f, 1.5f);
+            AddMovingMazeWall(parent, new Vector3(0.5f, 1.25f, 0), new Vector3(t, 1.5f, 1),
+                MovingWall.MoveAxis.Horizontal, 2.5f, 1.5f, Mathf.PI * 0.5f);
+            // Static red-herring dead-ends
+            AddMazeWall(parent, new Vector3( 3.5f, -1.5f, 0), new Vector3(3f, t, 1), mazeColor);
+            AddMazeWall(parent, new Vector3(-3.5f, 1.25f, 0), new Vector3(t, 2.5f, 1), mazeColor);
         }
         else if (depth == 2)
         {
-            // Crypt (10x10). 3 walls, 6 wide, ~3-unit gap, tighter.
-            AddMazeWall(parent, new Vector3(-1.5f, -2f,   0), new Vector3(6f, t, 1), mazeColor); // gap RIGHT
-            AddMazeWall(parent, new Vector3( 1.5f,  0.5f, 0), new Vector3(6f, t, 1), mazeColor); // gap LEFT
-            AddMazeWall(parent, new Vector3(-1.5f,  3f,   0), new Vector3(6f, t, 1), mazeColor); // gap RIGHT
+            // ─── CRYPT (10×10) ─── hardest: all three horizontals sliding + vertical gate
+            AddMovingMazeWall(parent, new Vector3(-1.5f, -2f, 0), new Vector3(6f, t, 1),
+                MovingWall.MoveAxis.Horizontal, 1.6f, 1.2f);                            // H1 sliding fast
+            AddMovingMazeWall(parent, new Vector3(1.5f, 0.5f, 0), new Vector3(6f, t, 1),
+                MovingWall.MoveAxis.Horizontal, 1.6f, 1.2f, Mathf.PI);                  // H2 opposite
+            AddMovingMazeWall(parent, new Vector3(-1.5f, 3f, 0), new Vector3(6f, t, 1),
+                MovingWall.MoveAxis.Horizontal, 1.6f, 1.2f);                            // H3 sliding
+            // Moving post + vertical up-down gate
+            AddMovingMazeWall(parent, new Vector3(-0.5f, -0.75f, 0), new Vector3(t, 1.2f, 1),
+                MovingWall.MoveAxis.Horizontal, 2.5f, 1.8f);
+            AddMovingMazeWall(parent, new Vector3(2.5f, 1.75f, 0), new Vector3(2f, t, 1),
+                MovingWall.MoveAxis.Vertical, 1.4f, 1.6f, 1f);
+            // Static dead-ends
+            AddMazeWall(parent, new Vector3(-3f,  1.75f, 0), new Vector3(t, 2f, 1), mazeColor);
+            AddMazeWall(parent, new Vector3(-2f,  3.75f, 0), new Vector3(2f, t, 1), mazeColor);
         }
         else
         {
-            // Tiny Chamber (8x8). Base case — simple 2-wall maze to reach Dagger.
-            AddMazeWall(parent, new Vector3(-1f, -0.5f, 0), new Vector3(5f, t, 1), mazeColor); // gap RIGHT
-            AddMazeWall(parent, new Vector3( 1f,  2f,   0), new Vector3(5f, t, 1), mazeColor); // gap LEFT
+            // ─── TINY CHAMBER (8×8) ─── base case, gentle static maze
+            AddMazeWall(parent, new Vector3(-1f, -0.5f, 0), new Vector3(5f, t, 1), mazeColor);
+            AddMazeWall(parent, new Vector3( 1f,  2f,   0), new Vector3(5f, t, 1), mazeColor);
+            AddMazeWall(parent, new Vector3( 0f,  0.75f, 0), new Vector3(t, 1f, 1), mazeColor);
         }
     }
 
-    static void AddMazeWall(Transform parent, Vector3 localPos, Vector3 scale, Color color)
+    static GameObject AddMazeWall(Transform parent, Vector3 localPos, Vector3 scale, Color color)
     {
         // Main wall body — solid bright color, on top of floor & grid
         GameObject w = CreateSprite($"MazeWall_{parent.childCount}", parent, localPos, scale, color, 4);
         BoxCollider2D col = w.AddComponent<BoxCollider2D>();
         col.size = new Vector2(1f, 1f);
 
-        // Dark outline around the wall (makes blocks pop against floor)
-        Color outlineColor = new Color(color.r * 0.25f, color.g * 0.25f, color.b * 0.25f, 1f);
+        // Dark outline: extend by a constant 0.15 world units on each side regardless of wall size
+        Color outlineColor = new Color(color.r * 0.2f, color.g * 0.2f, color.b * 0.2f, 1f);
         GameObject outline = new GameObject("Outline");
         outline.transform.SetParent(w.transform, false);
         outline.transform.localPosition = Vector3.zero;
-        outline.transform.localScale = new Vector3(1.1f, 1.25f, 1f);
+        outline.transform.localScale = new Vector3(
+            (scale.x + 0.3f) / scale.x,
+            (scale.y + 0.3f) / scale.y,
+            1f);
         SpriteRenderer osr = outline.AddComponent<SpriteRenderer>();
         osr.sprite = Square();
         osr.color = outlineColor;
         osr.sortingOrder = 3;
 
-        // Bright top highlight stripe — sits ABOVE the wall body for 3D retro pixel feel
+        // Retro highlight: thin bright stripe. Placed on TOP for horizontal walls,
+        // on LEFT side for vertical walls so the "light source" feels consistent.
+        bool isHorizontal = scale.x >= scale.y;
         GameObject highlight = new GameObject("Highlight");
         highlight.transform.SetParent(w.transform, false);
-        highlight.transform.localPosition = new Vector3(0, 0.35f, 0);
-        highlight.transform.localScale = new Vector3(0.95f, 0.2f, 1f);
+        if (isHorizontal)
+        {
+            highlight.transform.localPosition = new Vector3(0f, 0.32f, 0f);
+            highlight.transform.localScale = new Vector3(0.92f, 0.22f, 1f);
+        }
+        else
+        {
+            highlight.transform.localPosition = new Vector3(-0.32f, 0f, 0f);
+            highlight.transform.localScale = new Vector3(0.22f, 0.92f, 1f);
+        }
         SpriteRenderer hsr = highlight.AddComponent<SpriteRenderer>();
         hsr.sprite = Square();
-        hsr.color = Color.Lerp(color, Color.white, 0.65f);
+        hsr.color = Color.Lerp(color, Color.white, 0.6f);
         hsr.sortingOrder = 5;
+
+        return w;
+    }
+
+    // Golden/yellow tint for moving walls so player visually distinguishes them
+    static readonly Color MOVING_WALL_COLOR = new Color(1f, 0.85f, 0.25f, 1f);
+
+    /// <summary>Creates a maze wall that oscillates back and forth.</summary>
+    static GameObject AddMovingMazeWall(Transform parent, Vector3 localPos, Vector3 scale,
+        MovingWall.MoveAxis axis, float distance, float speed, float phase = 0f)
+    {
+        GameObject w = AddMazeWall(parent, localPos, scale, MOVING_WALL_COLOR);
+        w.name = $"MovingWall_{parent.childCount}";
+
+        MovingWall mw = w.AddComponent<MovingWall>();
+        mw.axis = axis;
+        mw.distance = distance;
+        mw.speed = speed;
+        mw.phaseOffset = phase;
+
+        return w;
     }
 
     // ═══════════════════════════════════════════════════
