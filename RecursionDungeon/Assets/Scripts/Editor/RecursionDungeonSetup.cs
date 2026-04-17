@@ -4,12 +4,25 @@ using UnityEngine.UI;
 
 public class RecursionDungeonSetup : EditorWindow
 {
+    // ═══════════ RETRO PIXEL PALETTE ═══════════
+    static readonly Color C_BG_DARK      = new Color(0.04f, 0.02f, 0.10f, 1f);
+    static readonly Color C_PANEL        = new Color(0.12f, 0.07f, 0.22f, 0.95f);
+    static readonly Color C_PANEL_BORDER = new Color(0.55f, 0.35f, 0.95f, 1f);
+    static readonly Color C_ACCENT_CYAN  = new Color(0f, 0.95f, 1f, 1f);
+    static readonly Color C_ACCENT_PINK  = new Color(1f, 0.30f, 0.70f, 1f);
+    static readonly Color C_ACCENT_YELLOW= new Color(1f, 0.90f, 0.15f, 1f);
+    static readonly Color C_ACCENT_GREEN = new Color(0.30f, 1f, 0.45f, 1f);
+    static readonly Color C_ACCENT_RED   = new Color(1f, 0.25f, 0.30f, 1f);
+    static readonly Color C_TEXT         = new Color(0.98f, 0.98f, 0.92f, 1f);
+    static readonly Color C_TEXT_DIM     = new Color(0.60f, 0.55f, 0.75f, 1f);
+    static readonly Color C_TEXT_SHADOW  = new Color(0f, 0f, 0f, 0.9f);
+
+    // ═══════════ MENU ENTRIES ═══════════
     [MenuItem("Tools/Recursion Dungeon/Build FULL Game Scene")]
     static void BuildGameScene()
     {
         if (!EditorUtility.DisplayDialog("Build Game Scene",
-            "This will create all GameObjects for the game scene. Continue?",
-            "Yes", "Cancel"))
+            "Build all GameObjects for the game scene?", "Yes", "Cancel"))
             return;
 
         BuildPlayer();
@@ -17,30 +30,49 @@ public class RecursionDungeonSetup : EditorWindow
         BuildManagers();
         BuildCanvas();
         SetupCamera();
+        EnsureEventSystem();
         WireReferences();
 
-        Debug.Log("=== Recursion Dungeon Game Scene built! Check hierarchy. ===");
+        Debug.Log("=== Recursion Dungeon Game Scene built! ===");
     }
 
     [MenuItem("Tools/Recursion Dungeon/Build Main Menu Scene")]
     static void BuildMainMenuScene()
     {
         if (!EditorUtility.DisplayDialog("Build Main Menu",
-            "This will create Main Menu GameObjects. Continue?",
-            "Yes", "Cancel"))
+            "Build Main Menu GameObjects?", "Yes", "Cancel"))
             return;
-
         BuildMainMenu();
-        Debug.Log("=== Main Menu built! Save as 'MainMenu' scene. ===");
+        EnsureEventSystem();
+        Debug.Log("=== Main Menu built! ===");
+    }
+
+    [MenuItem("Tools/Recursion Dungeon/Add Missing EventSystem (fix unclickable buttons)")]
+    static void AddEventSystemMenu()
+    {
+        EnsureEventSystem();
+        EditorUtility.DisplayDialog("Done",
+            "EventSystem has been added to the current scene.\nSave the scene and UI buttons will now be clickable.",
+            "OK");
+    }
+
+    /// <summary>Makes sure the scene contains an EventSystem so UI buttons receive mouse clicks.</summary>
+    static void EnsureEventSystem()
+    {
+        var existing = Object.FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>();
+        if (existing != null) return;
+
+        GameObject es = new GameObject("EventSystem");
+        es.AddComponent<UnityEngine.EventSystems.EventSystem>();
+        es.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+        Debug.Log("EventSystem added to scene.");
     }
 
     [MenuItem("Tools/Recursion Dungeon/Configure Build Settings (add both scenes)")]
     static void ConfigureBuildSettings()
     {
         string[] sceneGuids = AssetDatabase.FindAssets("t:Scene");
-        string mainMenuPath = null;
-        string gameScenePath = null;
-
+        string mainMenuPath = null, gameScenePath = null;
         foreach (var guid in sceneGuids)
         {
             string path = AssetDatabase.GUIDToAssetPath(guid);
@@ -48,27 +80,20 @@ public class RecursionDungeonSetup : EditorWindow
             if (fileName == "MainMenu") mainMenuPath = path;
             else if (fileName == "GameScene") gameScenePath = path;
         }
-
         if (mainMenuPath == null || gameScenePath == null)
         {
             EditorUtility.DisplayDialog("Scenes Not Found",
-                $"Could not find both scenes:\nMainMenu: {(mainMenuPath ?? "NOT FOUND")}\nGameScene: {(gameScenePath ?? "NOT FOUND")}\n\nMake sure you've saved both scenes in Assets/Scenes/",
+                $"MainMenu: {(mainMenuPath ?? "NOT FOUND")}\nGameScene: {(gameScenePath ?? "NOT FOUND")}\n\nMake sure both are saved.",
                 "OK");
             return;
         }
-
-        var scenes = new System.Collections.Generic.List<EditorBuildSettingsScene>
+        EditorBuildSettings.scenes = new[]
         {
             new EditorBuildSettingsScene(mainMenuPath, true),
             new EditorBuildSettingsScene(gameScenePath, true)
         };
-
-        EditorBuildSettings.scenes = scenes.ToArray();
-
-        Debug.Log($"Build Settings configured:\n  0: {mainMenuPath}\n  1: {gameScenePath}");
         EditorUtility.DisplayDialog("Build Settings Configured",
-            $"Scenes added to Build Settings:\n\n0: MainMenu\n1: GameScene\n\nThe Play Again and Main Menu buttons will now work!",
-            "OK");
+            "Scenes added:\n0: MainMenu\n1: GameScene", "OK");
     }
 
     // ═══════════════════════════════════════════════════
@@ -80,10 +105,10 @@ public class RecursionDungeonSetup : EditorWindow
         player.tag = "Player";
 
         SpriteRenderer sr = player.AddComponent<SpriteRenderer>();
-        sr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
-        sr.color = new Color(0.3f, 0.85f, 1f);
+        sr.sprite = Circle();
+        sr.color = C_ACCENT_CYAN;
         sr.sortingOrder = 10;
-        player.transform.localScale = Vector3.one * 0.8f;
+        player.transform.localScale = Vector3.one * 0.75f;
 
         Rigidbody2D rb = player.AddComponent<Rigidbody2D>();
         rb.gravityScale = 0f;
@@ -94,87 +119,85 @@ public class RecursionDungeonSetup : EditorWindow
 
         player.AddComponent<PlayerController>();
         player.AddComponent<PlayerInventory>();
-
         PlayerCombat combat = player.AddComponent<PlayerCombat>();
         combat.monsterLayer = LayerMask.GetMask("Default");
         combat.attackRange = 1.8f;
 
-        // Direction arrow child
+        // Direction arrow
         GameObject arrow = new GameObject("DirectionArrow");
         arrow.transform.SetParent(player.transform);
-        arrow.transform.localPosition = new Vector3(0, 0.6f, 0);
-        arrow.transform.localScale = new Vector3(0.3f, 0.4f, 1f);
+        arrow.transform.localPosition = new Vector3(0, 0.55f, 0);
+        arrow.transform.localScale = new Vector3(0.35f, 0.4f, 1f);
         SpriteRenderer arrowSR = arrow.AddComponent<SpriteRenderer>();
-        arrowSR.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
+        arrowSR.sprite = Circle();
         arrowSR.color = Color.white;
         arrowSR.sortingOrder = 11;
 
-        // Weapon icon child
+        // Weapon icon
         GameObject weaponIcon = new GameObject("WeaponIcon");
         weaponIcon.transform.SetParent(player.transform);
-        weaponIcon.transform.localPosition = new Vector3(0.7f, -0.3f, 0);
-        weaponIcon.transform.localScale = Vector3.one * 0.5f;
+        weaponIcon.transform.localPosition = new Vector3(0.65f, -0.3f, 0);
+        weaponIcon.transform.localScale = Vector3.one * 0.45f;
         SpriteRenderer weaponSR = weaponIcon.AddComponent<SpriteRenderer>();
-        weaponSR.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
+        weaponSR.sprite = Circle();
         weaponSR.color = Color.gray;
         weaponSR.sortingOrder = 12;
         weaponSR.enabled = false;
-
         player.GetComponent<PlayerInventory>().weaponIconRenderer = weaponSR;
 
-        // "YOU" label
-        AddWorldLabel(player.transform, "YOU", new Vector3(0, -0.7f, 0),
-            new Color(0.3f, 0.85f, 1f), 28);
-
+        AddWorldLabel(player.transform, "YOU", new Vector3(0, -0.7f, 0), C_ACCENT_CYAN, 26);
         return player;
     }
 
     // ═══════════════════════════════════════════════════
-    //                     ROOMS
+    //                     ROOMS + MAZES
     // ═══════════════════════════════════════════════════
     static void BuildRooms()
     {
         GameObject roomsParent = new GameObject("Rooms");
 
         string[] roomNames = { "Room0_GrandHall", "Room1_DarkCave", "Room2_Crypt", "Room3_TinyChamber" };
-        float[] roomSizes = { 12f, 10.5f, 9f, 7.5f };
+        float[] roomSizes = { 14f, 12f, 10f, 8f };
 
-        // Brighter, more distinct floor colors
         Color[] floorColors = {
-            new Color(0.28f, 0.22f, 0.18f),
-            new Color(0.18f, 0.18f, 0.22f),
-            new Color(0.20f, 0.14f, 0.22f),
-            new Color(0.14f, 0.12f, 0.16f)
+            new Color(0.22f, 0.18f, 0.14f),
+            new Color(0.14f, 0.14f, 0.22f),
+            new Color(0.18f, 0.10f, 0.22f),
+            new Color(0.10f, 0.08f, 0.14f)
         };
-
-        // Bright, distinct wall colors per room
         Color[] wallColors = {
-            new Color(0.50f, 0.35f, 0.20f),
-            new Color(0.30f, 0.30f, 0.40f),
-            new Color(0.40f, 0.25f, 0.45f),
-            new Color(0.35f, 0.30f, 0.30f)
+            new Color(0.70f, 0.45f, 0.20f),
+            new Color(0.40f, 0.45f, 0.65f),
+            new Color(0.65f, 0.30f, 0.70f),
+            new Color(0.50f, 0.40f, 0.40f)
         };
 
         string[] monsterNames = { "Dragon", "Wolf", "Bat", "" };
         Color[] monsterColors = {
-            new Color(1f, 0.2f, 0.1f),       // bright red dragon
-            new Color(0.6f, 0.6f, 0.65f),    // silver wolf
-            new Color(0.75f, 0.3f, 1f),      // bright purple bat
+            new Color(1f, 0.20f, 0.10f),
+            new Color(0.75f, 0.75f, 0.80f),
+            new Color(0.85f, 0.30f, 1f),
             Color.clear
         };
-        float[] monsterSizes = { 1.8f, 1.4f, 1.2f, 0f };
+        // Monster sizes kept small enough to fit INSIDE the maze corridors
+        float[] monsterSizes = { 1.4f, 1.2f, 1.0f, 0f };
+        // Monsters placed in a DEAD-END POCKET on the right side of the first corridor
+        // so they're visible but do NOT block the player's traversal path through the maze.
+        Vector3[] monsterPositions = {
+            new Vector3(5f,   -1.5f, 0),   // Room 0: right dead-end past wall 1 gap
+            new Vector3(4.5f, -1f,   0),   // Room 1: right dead-end past wall 1 gap
+            new Vector3(3f,   -0.75f,0),   // Room 2: right dead-end past wall 1 gap
+            Vector3.zero
+        };
 
         string[] requiredWeapons = { "Fire Sword", "Bow", "Dagger", "" };
-        string[] rewardWeapons = { "", "Fire Sword", "Bow", "" };
+        string[] rewardWeapons   = { "",           "Fire Sword", "Bow", "" };
         Color[] rewardColors = {
             Color.clear,
-            new Color(1f, 0.5f, 0.05f),      // orange fire sword
-            new Color(0.5f, 0.3f, 0.1f),     // brown bow
+            new Color(1f, 0.50f, 0.05f),
+            new Color(0.55f, 0.35f, 0.10f),
             Color.clear
         };
-
-        string basePickup = "Dagger";
-        Color daggerColor = new Color(0.8f, 0.85f, 1f);
 
         for (int i = 0; i < 4; i++)
         {
@@ -185,102 +208,175 @@ public class RecursionDungeonSetup : EditorWindow
             float size = roomSizes[i];
             float half = size / 2f;
 
-            // ── Floor ──
+            // Floor
             CreateSprite($"Floor_{i}", room.transform, Vector3.zero,
                 new Vector3(size, size, 1), floorColors[i], 0);
 
-            // ── Floor grid lines for visual depth ──
+            // Floor pixel grid (more retro look)
+            Color gridDark = floorColors[i] * 0.75f; gridDark.a = 0.6f;
+            Color gridLight = floorColors[i] * 1.25f; gridLight.a = 0.4f;
             for (int g = -((int)half) + 1; g < (int)half; g++)
             {
-                Color gridColor = floorColors[i] * 1.15f;
-                gridColor.a = 0.3f;
                 CreateSprite($"GridH_{g}", room.transform, new Vector3(0, g, 0),
-                    new Vector3(size - 0.6f, 0.02f, 1), gridColor, 1);
+                    new Vector3(size - 0.6f, 0.05f, 1), gridLight, 1);
                 CreateSprite($"GridV_{g}", room.transform, new Vector3(g, 0, 0),
-                    new Vector3(0.02f, size - 0.6f, 1), gridColor, 1);
+                    new Vector3(0.05f, size - 0.6f, 1), gridLight, 1);
             }
 
-            // ── Walls (thick, visible) ──
-            float wallThick = 0.5f;
-            CreateWall($"WallTop_{i}", room.transform,
-                new Vector3(0, half + wallThick / 2f, 0),
+            // Perimeter walls
+            float wallThick = 0.6f;
+            CreateWall($"WallTop_{i}",    room.transform, new Vector3(0, half + wallThick/2f, 0),
                 new Vector3(size + wallThick * 2, wallThick, 1), wallColors[i]);
-            CreateWall($"WallBot_{i}", room.transform,
-                new Vector3(0, -half - wallThick / 2f, 0),
+            CreateWall($"WallBot_{i}",    room.transform, new Vector3(0, -half - wallThick/2f, 0),
                 new Vector3(size + wallThick * 2, wallThick, 1), wallColors[i]);
-            CreateWall($"WallLeft_{i}", room.transform,
-                new Vector3(-half - wallThick / 2f, 0, 0),
+            CreateWall($"WallLeft_{i}",   room.transform, new Vector3(-half - wallThick/2f, 0, 0),
                 new Vector3(wallThick, size + wallThick * 2, 1), wallColors[i]);
-            CreateWall($"WallRight_{i}", room.transform,
-                new Vector3(half + wallThick / 2f, 0, 0),
+            CreateWall($"WallRight_{i}",  room.transform, new Vector3(half + wallThick/2f, 0, 0),
                 new Vector3(wallThick, size + wallThick * 2, 1), wallColors[i]);
 
-            // ── Entry point ──
+            // ── INTERNAL MAZE WALLS ──
+            BuildMazeFor(i, room.transform, half, wallColors[i]);
+
+            // Entry point (bottom-left corner of the room so doors at center are reached via maze)
             GameObject entry = new GameObject($"EntryPoint_{i}");
             entry.transform.SetParent(room.transform);
-            entry.transform.localPosition = new Vector3(0, -half + 2f, 0);
+            entry.transform.localPosition = new Vector3(-half + 1.5f, -half + 1.5f, 0);
 
-            // ── Room name label on floor ──
+            // Room name label
             string displayName = roomNames[i].Replace($"Room{i}_", "").Replace("_", " ");
-            AddWorldLabel(room.transform, displayName, new Vector3(0, half - 1.5f, 0),
-                Color.white * 0.4f, 40);
+            AddWorldLabel(room.transform, displayName,
+                new Vector3(0, half - 1.0f, 0), new Color(1f, 1f, 1f, 0.35f), 45);
 
-            // ── Enter-deeper door (top) ──
+            // Enter-deeper door (top center)
             if (i < 3)
-            {
                 CreateDoor($"DoorDeeper_{i}", room.transform,
-                    new Vector3(0, half - 0.3f, 0), false, i + 1,
-                    Door.DoorType.EnterDeeper, "GO DEEPER >>>");
-            }
+                    new Vector3(0, half - 0.35f, 0), false, i + 1,
+                    Door.DoorType.EnterDeeper, "ENTER DEEPER >>>");
 
-            // ── Exit-to-parent door (bottom) ──
+            // Exit-to-parent door (bottom center)
             if (i > 0)
             {
-                bool locked = (i < 3 && !string.IsNullOrEmpty(monsterNames[i]));
+                bool locked = !string.IsNullOrEmpty(monsterNames[i]);
                 CreateDoor($"DoorExit_{i}", room.transform,
-                    new Vector3(0, -half + 0.3f, 0), locked, i - 1,
+                    new Vector3(0, -half + 0.35f, 0), locked, i - 1,
                     Door.DoorType.ExitToParent, "<<< GO BACK");
             }
 
-            // Room 0: victory exit door
+            // Room 0 victory door
             if (i == 0)
-            {
                 CreateDoor("DoorVictoryExit", room.transform,
-                    new Vector3(0, -half + 0.3f, 0), true, 0,
-                    Door.DoorType.ExitToParent, "<<< EXIT DUNGEON");
-            }
+                    new Vector3(0, -half + 0.35f, 0), true, 0,
+                    Door.DoorType.ExitToParent, "<<< ESCAPE DUNGEON");
 
-            // ── Monster ──
+            // Monster (except room 3)
             if (i < 3)
             {
                 GameObject monster = CreateMonster($"Monster_{monsterNames[i]}", room.transform,
-                    new Vector3(0, 1.5f, 0), monsterNames[i], monsterColors[i],
+                    monsterPositions[i], monsterNames[i], monsterColors[i],
                     monsterSizes[i], requiredWeapons[i], rewardWeapons[i], rewardColors[i]);
-
                 Monster mc = monster.GetComponent<Monster>();
-                Door exitDoor = null;
-                if (i == 0)
-                    exitDoor = room.transform.Find("DoorVictoryExit")?.GetComponent<Door>();
-                else
-                    exitDoor = room.transform.Find($"DoorExit_{i}")?.GetComponent<Door>();
-                if (mc != null && exitDoor != null)
-                    mc.exitDoor = exitDoor;
+                Door exitDoor = (i == 0)
+                    ? room.transform.Find("DoorVictoryExit")?.GetComponent<Door>()
+                    : room.transform.Find($"DoorExit_{i}")?.GetComponent<Door>();
+                if (mc != null && exitDoor != null) mc.exitDoor = exitDoor;
             }
 
-            // ── Base case item (Room 3) ──
+            // Base case item (Room 3)
             if (i == 3)
             {
                 CreateItem("Item_Dagger", room.transform, new Vector3(0, 0.5f, 0),
-                    basePickup, daggerColor, 0.7f);
-
-                AddWorldLabel(room.transform, "BASE CASE",
-                    new Vector3(0, 2.5f, 0), new Color(0.2f, 1f, 0.4f), 36);
-                AddWorldLabel(room.transform, "No monster here!\nPick up the Dagger!",
-                    new Vector3(0, -1.5f, 0), new Color(1f, 1f, 0.5f), 22);
+                    "Dagger", new Color(0.85f, 0.90f, 1f), 0.7f);
+                AddWorldLabel(room.transform, "~ BASE CASE ~",
+                    new Vector3(0, 2.8f, 0), C_ACCENT_GREEN, 34);
+                AddWorldLabel(room.transform, "No monster here!\nGrab the Dagger and return.",
+                    new Vector3(0, -2f, 0), C_ACCENT_YELLOW, 20);
             }
 
             room.SetActive(i == 0);
         }
+    }
+
+    // ═══════════════════════════════════════════════════
+    //                    MAZE BUILDER
+    // Each room has a zigzag maze (more complex deeper).
+    // Walls are HIGH-CONTRAST stone-colored blocks that stand
+    // out against the dark floors.
+    // ═══════════════════════════════════════════════════
+    static readonly Color[] MAZE_COLORS = {
+        new Color(0.95f, 0.70f, 0.35f, 1f),  // Room 0: bright warm sandstone (contrasts brown floor)
+        new Color(0.55f, 0.75f, 1.00f, 1f),  // Room 1: bright ice blue (contrasts dark blue floor)
+        new Color(1.00f, 0.55f, 0.90f, 1f),  // Room 2: bright pink stone (contrasts dark purple floor)
+        new Color(0.85f, 0.85f, 0.90f, 1f)   // Room 3: bright bone white
+    };
+
+    // Maze design principle:
+    //   - 3 horizontal walls in a ZIGZAG pattern (gap alternates: RIGHT, LEFT, RIGHT)
+    //   - Every gap is at least 3.5 units wide (player is only 0.75 units)
+    //   - Corridor between walls is at least 2 units tall (fits monsters)
+    //   - Entry is at bottom-LEFT corner, door at TOP-CENTER
+    //   - Player path: go UP → RIGHT gap → UP → LEFT gap → UP → RIGHT gap → DOOR
+    static void BuildMazeFor(int depth, Transform parent, float half, Color wallColor)
+    {
+        Color mazeColor = MAZE_COLORS[depth];
+        float t = 1.0f;
+
+        if (depth == 0)
+        {
+            // Grand Hall (14x14). 3 walls, each 10 wide, leaves 3.5-unit gap.
+            // Wall1 covers left (gap right) | Wall2 covers right (gap left) | Wall3 covers left (gap right)
+            AddMazeWall(parent, new Vector3(-2f, -3f,  0), new Vector3(10f, t, 1), mazeColor); // gap RIGHT
+            AddMazeWall(parent, new Vector3( 2f,  0.5f,0), new Vector3(10f, t, 1), mazeColor); // gap LEFT
+            AddMazeWall(parent, new Vector3(-2f,  4f,  0), new Vector3(10f, t, 1), mazeColor); // gap RIGHT
+        }
+        else if (depth == 1)
+        {
+            // Dark Cave (12x12). 3 walls, 8 wide, ~3-unit gap.
+            AddMazeWall(parent, new Vector3(-1.5f, -2.5f, 0), new Vector3(8f, t, 1), mazeColor); // gap RIGHT
+            AddMazeWall(parent, new Vector3( 1.5f,  0f,   0), new Vector3(8f, t, 1), mazeColor); // gap LEFT
+            AddMazeWall(parent, new Vector3(-1.5f,  2.5f, 0), new Vector3(8f, t, 1), mazeColor); // gap RIGHT
+        }
+        else if (depth == 2)
+        {
+            // Crypt (10x10). 3 walls, 6 wide, ~3-unit gap, tighter.
+            AddMazeWall(parent, new Vector3(-1.5f, -2f,   0), new Vector3(6f, t, 1), mazeColor); // gap RIGHT
+            AddMazeWall(parent, new Vector3( 1.5f,  0.5f, 0), new Vector3(6f, t, 1), mazeColor); // gap LEFT
+            AddMazeWall(parent, new Vector3(-1.5f,  3f,   0), new Vector3(6f, t, 1), mazeColor); // gap RIGHT
+        }
+        else
+        {
+            // Tiny Chamber (8x8). Base case — simple 2-wall maze to reach Dagger.
+            AddMazeWall(parent, new Vector3(-1f, -0.5f, 0), new Vector3(5f, t, 1), mazeColor); // gap RIGHT
+            AddMazeWall(parent, new Vector3( 1f,  2f,   0), new Vector3(5f, t, 1), mazeColor); // gap LEFT
+        }
+    }
+
+    static void AddMazeWall(Transform parent, Vector3 localPos, Vector3 scale, Color color)
+    {
+        // Main wall body — solid bright color, on top of floor & grid
+        GameObject w = CreateSprite($"MazeWall_{parent.childCount}", parent, localPos, scale, color, 4);
+        BoxCollider2D col = w.AddComponent<BoxCollider2D>();
+        col.size = new Vector2(1f, 1f);
+
+        // Dark outline around the wall (makes blocks pop against floor)
+        Color outlineColor = new Color(color.r * 0.25f, color.g * 0.25f, color.b * 0.25f, 1f);
+        GameObject outline = new GameObject("Outline");
+        outline.transform.SetParent(w.transform, false);
+        outline.transform.localPosition = Vector3.zero;
+        outline.transform.localScale = new Vector3(1.1f, 1.25f, 1f);
+        SpriteRenderer osr = outline.AddComponent<SpriteRenderer>();
+        osr.sprite = Square();
+        osr.color = outlineColor;
+        osr.sortingOrder = 3;
+
+        // Bright top highlight stripe — sits ABOVE the wall body for 3D retro pixel feel
+        GameObject highlight = new GameObject("Highlight");
+        highlight.transform.SetParent(w.transform, false);
+        highlight.transform.localPosition = new Vector3(0, 0.35f, 0);
+        highlight.transform.localScale = new Vector3(0.95f, 0.2f, 1f);
+        SpriteRenderer hsr = highlight.AddComponent<SpriteRenderer>();
+        hsr.sprite = Square();
+        hsr.color = Color.Lerp(color, Color.white, 0.65f);
+        hsr.sortingOrder = 5;
     }
 
     // ═══════════════════════════════════════════════════
@@ -289,7 +385,6 @@ public class RecursionDungeonSetup : EditorWindow
     static void BuildManagers()
     {
         GameObject managers = new GameObject("--- MANAGERS ---");
-
         GameObject gm = new GameObject("GameManager");
         gm.transform.SetParent(managers.transform);
         gm.AddComponent<GameManager>();
@@ -300,7 +395,6 @@ public class RecursionDungeonSetup : EditorWindow
 
         Transform roomsParent = GameObject.Find("Rooms")?.transform;
         Transform player = GameObject.Find("Player")?.transform;
-
         if (roomsParent != null)
         {
             roomMgr.rooms = new GameObject[4];
@@ -311,12 +405,11 @@ public class RecursionDungeonSetup : EditorWindow
                 roomMgr.entryPoints[i] = roomsParent.GetChild(i).Find($"EntryPoint_{i}");
             }
         }
-        if (player != null)
-            roomMgr.player = player;
+        if (player != null) roomMgr.player = player;
     }
 
     // ═══════════════════════════════════════════════════
-    //                    CANVAS / UI
+    //                    RETRO PIXEL CANVAS
     // ═══════════════════════════════════════════════════
     static void BuildCanvas()
     {
@@ -332,7 +425,7 @@ public class RecursionDungeonSetup : EditorWindow
         UIManager uiMgr = canvasGO.AddComponent<UIManager>();
         CameraTransition camTrans = canvasGO.AddComponent<CameraTransition>();
 
-        // ── Fade overlay ──
+        // Fade
         GameObject fadeObj = CreateUIImage("FadeImage", canvasGO.transform, Color.black);
         StretchFull(fadeObj);
         Image fadeImg = fadeObj.GetComponent<Image>();
@@ -340,167 +433,150 @@ public class RecursionDungeonSetup : EditorWindow
         fadeImg.raycastTarget = false;
         camTrans.fadeImage = fadeImg;
 
-        // ── HUD: Top Left (Room Info) ──
-        GameObject hudLeft = CreateUIPanel("HUD_TopLeft", canvasGO.transform,
-            new Vector2(0, 1), new Vector2(0, 1), new Vector2(15, -15),
-            new Vector2(320, 90), new Color(0.05f, 0.05f, 0.15f, 0.85f));
+        // ── TOP LEFT: Room Info (pixel framed) ──
+        GameObject hudLeft = CreatePixelPanel("HUD_TopLeft", canvasGO.transform,
+            new Vector2(0, 1), new Vector2(15, -15), new Vector2(340, 100),
+            C_PANEL, C_ACCENT_CYAN);
 
-        GameObject depthText = CreateUIText("DepthText", hudLeft.transform, "Depth: 0",
-            26, TextAnchor.UpperLeft, new Vector2(15, -8), new Vector2(290, 40));
-        depthText.GetComponent<Text>().color = new Color(0.4f, 0.9f, 1f);
+        GameObject depthText = CreatePixelText("DepthText", hudLeft.transform, "DEPTH: 0",
+            28, TextAnchor.UpperLeft, new Vector2(20, -12), new Vector2(300, 40), C_ACCENT_CYAN);
 
-        GameObject roomText = CreateUIText("RoomNameText", hudLeft.transform, "Grand Hall",
-            20, TextAnchor.UpperLeft, new Vector2(15, -45), new Vector2(290, 35));
-        roomText.GetComponent<Text>().color = new Color(0.9f, 0.85f, 0.7f);
+        GameObject roomText = CreatePixelText("RoomNameText", hudLeft.transform, "GRAND HALL",
+            22, TextAnchor.UpperLeft, new Vector2(20, -52), new Vector2(300, 35), C_ACCENT_YELLOW);
 
         uiMgr.depthText = depthText.GetComponent<Text>();
         uiMgr.roomNameText = roomText.GetComponent<Text>();
 
-        // ── HUD: Top Right (Weapon) ──
-        GameObject hudRight = CreateUIPanel("HUD_TopRight", canvasGO.transform,
-            new Vector2(1, 1), new Vector2(1, 1), new Vector2(-15, -15),
-            new Vector2(300, 70), new Color(0.05f, 0.05f, 0.15f, 0.85f));
+        // ── TOP RIGHT: Weapon ──
+        GameObject hudRight = CreatePixelPanel("HUD_TopRight", canvasGO.transform,
+            new Vector2(1, 1), new Vector2(-15, -15), new Vector2(340, 80),
+            C_PANEL, C_ACCENT_PINK);
+        hudRight.GetComponent<RectTransform>().pivot = new Vector2(1, 1);
 
-        GameObject weaponText = CreateUIText("WeaponText", hudRight.transform, "Weapon: None",
-            22, TextAnchor.MiddleRight, new Vector2(-15, 0), new Vector2(230, 40));
-        weaponText.GetComponent<Text>().color = new Color(1f, 0.9f, 0.5f);
+        GameObject weaponText = CreatePixelText("WeaponText", hudRight.transform, "WEAPON: NONE",
+            22, TextAnchor.MiddleRight, new Vector2(-20, 0), new Vector2(250, 40), C_ACCENT_PINK);
 
         GameObject weaponIcon = CreateUIImage("WeaponIcon", hudRight.transform, Color.gray);
         RectTransform wiRT = weaponIcon.GetComponent<RectTransform>();
         wiRT.anchorMin = new Vector2(0, 0.5f); wiRT.anchorMax = new Vector2(0, 0.5f);
-        wiRT.anchoredPosition = new Vector2(30, 0);
-        wiRT.sizeDelta = new Vector2(40, 40);
+        wiRT.anchoredPosition = new Vector2(35, 0);
+        wiRT.sizeDelta = new Vector2(45, 45);
+        AddPixelBorder(weaponIcon, Color.white, 2);
 
         uiMgr.weaponNameText = weaponText.GetComponent<Text>();
         uiMgr.weaponIconImage = weaponIcon.GetComponent<Image>();
 
-        // ── Timer (top center) ──
-        GameObject timerPanel = CreateUIPanel("TimerPanel", canvasGO.transform,
-            new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -15),
-            new Vector2(140, 45), new Color(0.05f, 0.05f, 0.15f, 0.85f));
+        // ── TOP CENTER: Timer ──
+        GameObject timerPanel = CreatePixelPanel("TimerPanel", canvasGO.transform,
+            new Vector2(0.5f, 1), new Vector2(0, -15), new Vector2(160, 55),
+            C_PANEL, C_ACCENT_GREEN);
         timerPanel.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 1);
 
-        GameObject timerText = CreateUIText("TimerText", timerPanel.transform, "00:00",
-            24, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(130, 40));
-        timerText.GetComponent<Text>().color = new Color(0.8f, 1f, 0.8f);
+        GameObject timerText = CreatePixelText("TimerText", timerPanel.transform, "00:00",
+            26, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(150, 50), C_ACCENT_GREEN);
         RectTransform ttRT = timerText.GetComponent<RectTransform>();
         ttRT.anchorMin = Vector2.zero; ttRT.anchorMax = Vector2.one;
         ttRT.offsetMin = Vector2.zero; ttRT.offsetMax = Vector2.zero;
         uiMgr.timerText = timerText.GetComponent<Text>();
 
-        // ── Dialog Panel (center bottom) ──
-        GameObject dialogPanel = CreateUIPanel("DialogPanel", canvasGO.transform,
-            new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 40),
-            new Vector2(600, 70), new Color(0.1f, 0.05f, 0.2f, 0.92f));
+        // ── BOTTOM CENTER: Dialog ──
+        GameObject dialogPanel = CreatePixelPanel("DialogPanel", canvasGO.transform,
+            new Vector2(0.5f, 0), new Vector2(0, 50), new Vector2(640, 80),
+            C_PANEL, C_ACCENT_YELLOW);
         dialogPanel.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 0);
 
-        // Border for dialog
-        Outline dlgOutline = dialogPanel.AddComponent<Outline>();
-        dlgOutline.effectColor = new Color(0.5f, 0.3f, 0.8f, 0.8f);
-        dlgOutline.effectDistance = new Vector2(2, 2);
-
-        GameObject dialogText = CreateUIText("DialogText", dialogPanel.transform, "",
-            24, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(580, 60));
+        GameObject dialogText = CreatePixelText("DialogText", dialogPanel.transform, "",
+            26, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(610, 70), C_ACCENT_YELLOW);
         RectTransform dlgTRT = dialogText.GetComponent<RectTransform>();
         dlgTRT.anchorMin = Vector2.zero; dlgTRT.anchorMax = Vector2.one;
-        dlgTRT.offsetMin = new Vector2(10, 5); dlgTRT.offsetMax = new Vector2(-10, -5);
-        dialogText.GetComponent<Text>().color = new Color(1f, 1f, 0.7f);
+        dlgTRT.offsetMin = new Vector2(15, 8); dlgTRT.offsetMax = new Vector2(-15, -8);
 
         uiMgr.dialogPanel = dialogPanel;
         uiMgr.dialogText = dialogText.GetComponent<Text>();
         dialogPanel.SetActive(false);
 
-        // ── Controls hint (bottom right) ──
-        GameObject controlsPanel = CreateUIPanel("ControlsHint", canvasGO.transform,
-            new Vector2(1, 0), new Vector2(1, 0), new Vector2(-15, 15),
-            new Vector2(220, 90), new Color(0, 0, 0, 0.6f));
-        controlsPanel.GetComponent<RectTransform>().pivot = new Vector2(1, 0);
+        // ── BOTTOM RIGHT: Controls ──
+        GameObject controls = CreatePixelPanel("ControlsHint", canvasGO.transform,
+            new Vector2(1, 0), new Vector2(-15, 15), new Vector2(260, 110),
+            new Color(0.08f, 0.05f, 0.15f, 0.85f), C_TEXT_DIM);
+        controls.GetComponent<RectTransform>().pivot = new Vector2(1, 0);
 
-        GameObject controlsText = CreateUIText("ControlsText", controlsPanel.transform,
-            "WASD - Move\nSPACE - Attack\nWalk into doors to enter",
-            14, TextAnchor.MiddleLeft, Vector2.zero, new Vector2(200, 80));
+        GameObject controlsText = CreatePixelText("ControlsText", controls.transform,
+            "WASD - MOVE\nSPACE - ATTACK\nFIND DOORS IN MAZE",
+            15, TextAnchor.MiddleLeft, Vector2.zero, new Vector2(240, 100), C_TEXT_DIM);
         RectTransform ctrlRT = controlsText.GetComponent<RectTransform>();
         ctrlRT.anchorMin = Vector2.zero; ctrlRT.anchorMax = Vector2.one;
-        ctrlRT.offsetMin = new Vector2(10, 5); ctrlRT.offsetMax = new Vector2(-10, -5);
-        controlsText.GetComponent<Text>().color = new Color(0.6f, 0.6f, 0.7f);
+        ctrlRT.offsetMin = new Vector2(15, 8); ctrlRT.offsetMax = new Vector2(-15, -8);
 
-        // ── Call Stack UI (left side) ──
-        GameObject callStackBG = CreateUIPanel("CallStackPanel", canvasGO.transform,
-            new Vector2(0, 0), new Vector2(0, 0), new Vector2(15, 120),
-            new Vector2(300, 450), new Color(0.05f, 0.05f, 0.1f, 0.75f));
+        // ── LEFT SIDE: Call Stack ──
+        GameObject callStackBG = CreatePixelPanel("CallStackPanel", canvasGO.transform,
+            new Vector2(0, 0), new Vector2(15, 150), new Vector2(320, 470),
+            C_PANEL, C_PANEL_BORDER);
         callStackBG.GetComponent<RectTransform>().pivot = new Vector2(0, 0);
 
         // Title bar
-        GameObject csTitleBar = CreateUIPanel("TitleBar", callStackBG.transform,
-            new Vector2(0, 1), new Vector2(1, 1), Vector2.zero,
-            new Vector2(0, 35), new Color(0.15f, 0.1f, 0.3f, 0.9f));
-        RectTransform csTitleRT = csTitleBar.GetComponent<RectTransform>();
-        csTitleRT.pivot = new Vector2(0.5f, 1);
-        csTitleRT.anchorMin = new Vector2(0, 1);
-        csTitleRT.anchorMax = new Vector2(1, 1);
-        csTitleRT.offsetMin = new Vector2(0, -35);
-        csTitleRT.offsetMax = Vector2.zero;
+        GameObject titleBar = CreateUIImage("TitleBar", callStackBG.transform, C_PANEL_BORDER);
+        RectTransform tbRT = titleBar.GetComponent<RectTransform>();
+        tbRT.anchorMin = new Vector2(0, 1); tbRT.anchorMax = new Vector2(1, 1);
+        tbRT.pivot = new Vector2(0.5f, 1);
+        tbRT.offsetMin = new Vector2(0, -40); tbRT.offsetMax = Vector2.zero;
 
-        CreateUIText("CallStackTitle", csTitleBar.transform, "CALL STACK",
-            18, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(280, 30));
+        CreatePixelText("CallStackTitle", titleBar.transform, "≡ CALL STACK ≡",
+            20, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(300, 35), Color.white);
 
         // Stack container
         GameObject stackContainer = new GameObject("StackContainer");
         stackContainer.transform.SetParent(callStackBG.transform, false);
         RectTransform scRT = stackContainer.AddComponent<RectTransform>();
         scRT.anchorMin = new Vector2(0, 0); scRT.anchorMax = new Vector2(1, 1);
-        scRT.offsetMin = new Vector2(8, 8); scRT.offsetMax = new Vector2(-8, -40);
+        scRT.offsetMin = new Vector2(10, 10); scRT.offsetMax = new Vector2(-10, -45);
         VerticalLayoutGroup vlg = stackContainer.AddComponent<VerticalLayoutGroup>();
-        vlg.spacing = 6;
+        vlg.spacing = 8;
         vlg.childAlignment = TextAnchor.LowerLeft;
         vlg.childControlWidth = true;
         vlg.childControlHeight = false;
         vlg.childForceExpandWidth = true;
         vlg.childForceExpandHeight = false;
-        ContentSizeFitter csf = stackContainer.AddComponent<ContentSizeFitter>();
-        csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        stackContainer.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        CallStackUI callStackUI = canvasGO.AddComponent<CallStackUI>();
-        callStackUI.stackContainer = stackContainer.transform;
+        CallStackUI csUI = canvasGO.AddComponent<CallStackUI>();
+        csUI.stackContainer = stackContainer.transform;
 
-        // Frame prefab
-        GameObject framePrefab = CreateCallStackFramePrefab(canvasGO.transform);
-        callStackUI.framePrefab = framePrefab;
+        GameObject framePrefab = CreateCallStackFrame(canvasGO.transform);
+        csUI.framePrefab = framePrefab;
         framePrefab.SetActive(false);
 
-        // ── Victory Panel ──
-        GameObject victoryPanel = CreateUIPanel("VictoryPanel", canvasGO.transform,
-            new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero,
-            new Vector2(550, 380), new Color(0.05f, 0.02f, 0.12f, 0.97f));
+        // ── VICTORY PANEL ──
+        GameObject victoryPanel = CreatePixelPanel("VictoryPanel", canvasGO.transform,
+            new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(620, 430),
+            C_PANEL, C_ACCENT_YELLOW);
         victoryPanel.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 0.5f);
-        Outline victoryOutline = victoryPanel.AddComponent<Outline>();
-        victoryOutline.effectColor = new Color(1f, 0.8f, 0.2f, 0.6f);
-        victoryOutline.effectDistance = new Vector2(3, 3);
+        AddPixelBorder(victoryPanel, C_ACCENT_YELLOW, 4);
 
-        GameObject vicTitle = CreateUIText("VictoryTitle", victoryPanel.transform,
-            "You Escaped the Dungeon!",
-            36, TextAnchor.MiddleCenter, new Vector2(0, 100), new Vector2(500, 60));
-        vicTitle.GetComponent<Text>().color = new Color(1f, 0.85f, 0.2f);
+        CreatePixelText("VictoryTitle", victoryPanel.transform, "★ VICTORY ★",
+            48, TextAnchor.MiddleCenter, new Vector2(0, 140), new Vector2(600, 70), C_ACCENT_YELLOW);
 
-        GameObject vicSubtitle = CreateUIText("VictorySubtitle", victoryPanel.transform,
-            "The recursion has been unwound!",
-            20, TextAnchor.MiddleCenter, new Vector2(0, 55), new Vector2(500, 35));
-        vicSubtitle.GetComponent<Text>().color = new Color(0.7f, 0.9f, 0.7f);
-        vicSubtitle.GetComponent<Text>().fontStyle = FontStyle.Italic;
+        CreatePixelText("VictorySubtitle", victoryPanel.transform, "YOU ESCAPED THE DUNGEON!",
+            22, TextAnchor.MiddleCenter, new Vector2(0, 80), new Vector2(580, 40), Color.white);
 
-        GameObject victoryTime = CreateUIText("VictoryTime", victoryPanel.transform, "Time: 00:00",
-            26, TextAnchor.MiddleCenter, new Vector2(0, 5), new Vector2(500, 40));
-        victoryTime.GetComponent<Text>().color = Color.white;
+        CreatePixelText("RecursionNote", victoryPanel.transform,
+            "~ The recursion has unwound ~",
+            18, TextAnchor.MiddleCenter, new Vector2(0, 35), new Vector2(580, 30), C_ACCENT_GREEN);
 
-        GameObject playAgainBtn = CreateUIButton("PlayAgainButton", victoryPanel.transform,
-            "Play Again", new Vector2(-90, -70), new Vector2(170, 50),
-            new Color(0.15f, 0.5f, 0.15f));
-        playAgainBtn.GetComponentInChildren<Text>().fontSize = 22;
+        GameObject victoryTime = CreatePixelText("VictoryTime", victoryPanel.transform, "TIME: 00:00",
+            28, TextAnchor.MiddleCenter, new Vector2(0, -20), new Vector2(580, 45), C_ACCENT_CYAN);
 
-        GameObject mainMenuBtn = CreateUIButton("MainMenuButton", victoryPanel.transform,
-            "Main Menu", new Vector2(90, -70), new Vector2(170, 50),
-            new Color(0.5f, 0.15f, 0.15f));
-        mainMenuBtn.GetComponentInChildren<Text>().fontSize = 22;
+        GameObject playAgainBtn = CreatePixelButton("PlayAgainButton", victoryPanel.transform,
+            "PLAY AGAIN  [R]", new Vector2(-115, -95), new Vector2(220, 55),
+            new Color(0.15f, 0.5f, 0.2f), C_ACCENT_GREEN);
+
+        GameObject mainMenuBtn = CreatePixelButton("MainMenuButton", victoryPanel.transform,
+            "MAIN MENU  [M]", new Vector2(115, -95), new Vector2(220, 55),
+            new Color(0.5f, 0.15f, 0.2f), C_ACCENT_RED);
+
+        CreatePixelText("KeyHint", victoryPanel.transform,
+            "Press R to replay  ·  M for main menu",
+            15, TextAnchor.MiddleCenter, new Vector2(0, -160), new Vector2(560, 25), C_TEXT_DIM);
 
         uiMgr.victoryPanel = victoryPanel;
         uiMgr.victoryTimeText = victoryTime.GetComponent<Text>();
@@ -510,7 +586,7 @@ public class RecursionDungeonSetup : EditorWindow
     }
 
     // ═══════════════════════════════════════════════════
-    //                    CAMERA
+    //                       CAMERA
     // ═══════════════════════════════════════════════════
     static void SetupCamera()
     {
@@ -524,20 +600,18 @@ public class RecursionDungeonSetup : EditorWindow
             camGO.transform.position = new Vector3(0, 0, -10);
         }
         cam.orthographic = true;
-        cam.orthographicSize = 7f;
-        cam.backgroundColor = new Color(0.03f, 0.03f, 0.06f);
+        cam.orthographicSize = 8f;
+        cam.backgroundColor = C_BG_DARK;
         cam.clearFlags = CameraClearFlags.SolidColor;
-
         if (cam.GetComponent<CameraFollow>() == null)
             cam.gameObject.AddComponent<CameraFollow>();
-
         CameraFollow follow = cam.GetComponent<CameraFollow>();
         Transform player = GameObject.Find("Player")?.transform;
         if (player != null) follow.target = player;
     }
 
     // ═══════════════════════════════════════════════════
-    //                  MAIN MENU
+    //                     MAIN MENU
     // ═══════════════════════════════════════════════════
     static void BuildMainMenu()
     {
@@ -552,7 +626,7 @@ public class RecursionDungeonSetup : EditorWindow
         }
         cam.orthographic = true;
         cam.clearFlags = CameraClearFlags.SolidColor;
-        cam.backgroundColor = new Color(0.04f, 0.02f, 0.08f);
+        cam.backgroundColor = C_BG_DARK;
 
         GameObject canvasGO = new GameObject("MenuCanvas");
         Canvas canvas = canvasGO.AddComponent<Canvas>();
@@ -563,55 +637,78 @@ public class RecursionDungeonSetup : EditorWindow
         canvasGO.AddComponent<GraphicRaycaster>();
 
         // Background
-        GameObject bg = CreateUIImage("Background", canvasGO.transform, new Color(0.04f, 0.02f, 0.08f));
+        GameObject bg = CreateUIImage("Background", canvasGO.transform, C_BG_DARK);
         StretchFull(bg);
 
-        // Title
-        GameObject title = CreateUIText("Title", canvasGO.transform, "RECURSION\nDUNGEON",
-            64, TextAnchor.MiddleCenter, new Vector2(0, 140), new Vector2(900, 160));
-        title.GetComponent<Text>().color = new Color(1f, 0.85f, 0.2f);
+        // Retro grid pattern overlay
+        GameObject gridOverlay = CreateUIImage("GridOverlay", canvasGO.transform,
+            new Color(0.55f, 0.35f, 0.95f, 0.08f));
+        StretchFull(gridOverlay);
+
+        // Title shadow copy (pink)
+        GameObject titleShadow = CreatePixelText("TitleShadow", canvasGO.transform,
+            "RECURSION\nDUNGEON",
+            88, TextAnchor.MiddleCenter, new Vector2(6, 134), new Vector2(1000, 220), C_ACCENT_PINK);
+        titleShadow.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        // Main title (yellow)
+        GameObject title = CreatePixelText("Title", canvasGO.transform,
+            "RECURSION\nDUNGEON",
+            88, TextAnchor.MiddleCenter, new Vector2(0, 140), new Vector2(1000, 220), C_ACCENT_YELLOW);
+        title.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+        // Decorative line
+        GameObject decorLine1 = CreateUIImage("DecorLine1", canvasGO.transform, C_ACCENT_CYAN);
+        RectTransform dlRT = decorLine1.GetComponent<RectTransform>();
+        dlRT.anchoredPosition = new Vector2(0, 20);
+        dlRT.sizeDelta = new Vector2(500, 4);
 
         // Subtitle
-        GameObject subtitle = CreateUIText("Subtitle", canvasGO.transform,
-            "Solve the deepest room first.",
-            26, TextAnchor.MiddleCenter, new Vector2(0, 40), new Vector2(700, 40));
-        subtitle.GetComponent<Text>().color = new Color(0.6f, 0.6f, 0.85f);
+        GameObject subtitle = CreatePixelText("Subtitle", canvasGO.transform,
+            "SOLVE THE DEEPEST ROOM FIRST",
+            26, TextAnchor.MiddleCenter, new Vector2(0, -20), new Vector2(800, 40), C_ACCENT_CYAN);
 
-        // Code hint
-        GameObject hint = CreateUIText("Hint", canvasGO.transform,
-            "solve(room) {\n    weapon = solve(room.next);\n    defeat(room.monster, weapon);\n}",
-            18, TextAnchor.MiddleCenter, new Vector2(0, -30), new Vector2(600, 80));
-        hint.GetComponent<Text>().color = new Color(0.4f, 0.85f, 0.4f);
-        hint.GetComponent<Text>().fontStyle = FontStyle.Italic;
+        // Code block
+        GameObject codeBlock = CreatePixelPanel("CodeBlock", canvasGO.transform,
+            new Vector2(0.5f, 0.5f), new Vector2(0, -90), new Vector2(600, 110),
+            new Color(0.06f, 0.04f, 0.12f, 0.85f), C_ACCENT_GREEN);
+        codeBlock.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 0.5f);
+
+        CreatePixelText("CodeText", codeBlock.transform,
+            "solve(room) {\n   weapon = solve(room.next);\n   defeat(room.monster, weapon);\n}",
+            16, TextAnchor.MiddleCenter, Vector2.zero, new Vector2(580, 100), C_ACCENT_GREEN);
 
         // Play button
-        GameObject playBtn = CreateUIButton("PlayButton", canvasGO.transform,
-            "PLAY", new Vector2(0, -120), new Vector2(250, 60),
-            new Color(0.1f, 0.4f, 0.1f));
-        playBtn.GetComponentInChildren<Text>().fontSize = 32;
+        GameObject playBtn = CreatePixelButton("PlayButton", canvasGO.transform,
+            "▶ PLAY", new Vector2(0, -220), new Vector2(280, 70),
+            new Color(0.10f, 0.45f, 0.15f), C_ACCENT_GREEN);
+        playBtn.GetComponentInChildren<Text>().fontSize = 34;
 
         // Quit button
-        GameObject quitBtn = CreateUIButton("QuitButton", canvasGO.transform,
-            "QUIT", new Vector2(0, -200), new Vector2(200, 48),
-            new Color(0.4f, 0.12f, 0.12f));
-        quitBtn.GetComponentInChildren<Text>().fontSize = 22;
+        GameObject quitBtn = CreatePixelButton("QuitButton", canvasGO.transform,
+            "QUIT", new Vector2(0, -310), new Vector2(220, 55),
+            new Color(0.35f, 0.10f, 0.15f), C_ACCENT_RED);
+        quitBtn.GetComponentInChildren<Text>().fontSize = 24;
+
+        // Credit / hint bottom
+        CreatePixelText("Hint", canvasGO.transform,
+            "Use WASD to move · SPACE to attack · Find the path through the maze",
+            14, TextAnchor.MiddleCenter, new Vector2(0, 40), new Vector2(900, 30), C_TEXT_DIM);
+        RectTransform hintRT = canvasGO.transform.Find("Hint").GetComponent<RectTransform>();
+        hintRT.anchorMin = new Vector2(0.5f, 0); hintRT.anchorMax = new Vector2(0.5f, 0);
 
         MainMenu menu = canvasGO.AddComponent<MainMenu>();
         menu.playButton = playBtn.GetComponent<Button>();
         menu.quitButton = quitBtn.GetComponent<Button>();
     }
 
-    // ═══════════════════════════════════════════════════
-    //                WIRE REFERENCES
-    // ═══════════════════════════════════════════════════
     static void WireReferences()
     {
         GameObject prefabHolder = new GameObject("--- PREFAB TEMPLATES (hidden) ---");
-
         GameObject itemTemplate = new GameObject("ItemPrefab");
         itemTemplate.transform.SetParent(prefabHolder.transform);
         SpriteRenderer itemSR = itemTemplate.AddComponent<SpriteRenderer>();
-        itemSR.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
+        itemSR.sprite = Circle();
         itemSR.sortingOrder = 5;
         CircleCollider2D itemCol = itemTemplate.AddComponent<CircleCollider2D>();
         itemCol.isTrigger = true;
@@ -620,23 +717,41 @@ public class RecursionDungeonSetup : EditorWindow
         itemTemplate.transform.localScale = Vector3.one * 0.6f;
 
         Monster[] monsters = Object.FindObjectsByType<Monster>(FindObjectsSortMode.None);
-        foreach (var m in monsters)
-            m.rewardItemPrefab = itemTemplate;
-
+        foreach (var m in monsters) m.rewardItemPrefab = itemTemplate;
         prefabHolder.SetActive(false);
-        Debug.Log("References wired.");
     }
 
     // ═══════════════════════════════════════════════════
-    //              HELPER: WORLD-SPACE LABEL
+    //                WORLD-SPACE HELPERS
     // ═══════════════════════════════════════════════════
+    static Sprite Circle() => AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
+
+    // Built-in Background.psd has 9-slice borders that make the center look faded.
+    // We generate a pure solid white 4x4 sprite that tints cleanly to any color.
+    static Sprite _solidSquare;
+    static Sprite Square()
+    {
+        if (_solidSquare == null)
+        {
+            Texture2D tex = new Texture2D(4, 4, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Point;
+            tex.wrapMode = TextureWrapMode.Clamp;
+            Color[] pixels = new Color[16];
+            for (int i = 0; i < 16; i++) pixels[i] = Color.white;
+            tex.SetPixels(pixels);
+            tex.Apply();
+            _solidSquare = Sprite.Create(tex, new Rect(0, 0, 4, 4), new Vector2(0.5f, 0.5f), 4f);
+            _solidSquare.name = "SolidSquareSprite";
+        }
+        return _solidSquare;
+    }
+
     static GameObject AddWorldLabel(Transform parent, string text, Vector3 localPos, Color color, int fontSize)
     {
         GameObject labelGO = new GameObject("Label");
         labelGO.transform.SetParent(parent);
         labelGO.transform.localPosition = localPos;
         labelGO.transform.localRotation = Quaternion.identity;
-
         TextMesh tm = labelGO.AddComponent<TextMesh>();
         tm.text = text;
         tm.fontSize = fontSize;
@@ -645,16 +760,10 @@ public class RecursionDungeonSetup : EditorWindow
         tm.alignment = TextAlignment.Center;
         tm.color = color;
         tm.fontStyle = FontStyle.Bold;
-
-        MeshRenderer mr = labelGO.GetComponent<MeshRenderer>();
-        mr.sortingOrder = 15;
-
+        labelGO.GetComponent<MeshRenderer>().sortingOrder = 15;
         return labelGO;
     }
 
-    // ═══════════════════════════════════════════════════
-    //              HELPER: SPRITES & WALLS
-    // ═══════════════════════════════════════════════════
     static GameObject CreateSprite(string name, Transform parent, Vector3 localPos,
         Vector3 scale, Color color, int sortOrder)
     {
@@ -663,7 +772,7 @@ public class RecursionDungeonSetup : EditorWindow
         go.transform.localPosition = localPos;
         go.transform.localScale = scale;
         SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Background.psd");
+        sr.sprite = Square();
         sr.color = color;
         sr.sortingOrder = sortOrder;
         return go;
@@ -677,19 +786,16 @@ public class RecursionDungeonSetup : EditorWindow
         return wall;
     }
 
-    // ═══════════════════════════════════════════════════
-    //              HELPER: DOORS
-    // ═══════════════════════════════════════════════════
     static GameObject CreateDoor(string name, Transform parent, Vector3 localPos,
         bool locked, int targetDepth, Door.DoorType type, string labelText)
     {
         GameObject door = new GameObject(name);
         door.transform.SetParent(parent);
         door.transform.localPosition = localPos;
-        door.transform.localScale = new Vector3(2.5f, 0.6f, 1f);
+        door.transform.localScale = new Vector3(2.8f, 0.7f, 1f);
 
         SpriteRenderer sr = door.AddComponent<SpriteRenderer>();
-        sr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Background.psd");
+        sr.sprite = Square();
         sr.sortingOrder = 3;
 
         BoxCollider2D col = door.AddComponent<BoxCollider2D>();
@@ -701,35 +807,27 @@ public class RecursionDungeonSetup : EditorWindow
         doorComp.targetRoomDepth = targetDepth;
         doorComp.isLocked = locked;
         doorComp.doorRenderer = sr;
+        sr.color = locked ? C_ACCENT_RED : C_ACCENT_GREEN;
 
-        Color unlockedCol = new Color(0.1f, 0.9f, 0.2f);
-        Color lockedCol = new Color(0.9f, 0.15f, 0.1f);
-        sr.color = locked ? lockedCol : unlockedCol;
-
-        // Lock indicator
         GameObject lockIcon = new GameObject("LockIndicator");
         lockIcon.transform.SetParent(door.transform);
         lockIcon.transform.localPosition = Vector3.zero;
-        lockIcon.transform.localScale = new Vector3(0.15f, 0.4f, 1f);
+        lockIcon.transform.localScale = new Vector3(0.13f, 0.35f, 1f);
         SpriteRenderer lockSR = lockIcon.AddComponent<SpriteRenderer>();
-        lockSR.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
-        lockSR.color = Color.yellow;
+        lockSR.sprite = Circle();
+        lockSR.color = C_ACCENT_YELLOW;
         lockSR.sortingOrder = 4;
         lockIcon.SetActive(locked);
         doorComp.lockIndicator = lockIcon;
 
-        // Door label
-        Color labelColor = locked ? new Color(1f, 0.4f, 0.4f) : new Color(0.4f, 1f, 0.5f);
-        float labelY = type == Door.DoorType.EnterDeeper ? -1.2f : 1.2f;
+        float labelY = (type == Door.DoorType.EnterDeeper) ? -1.1f : 1.1f;
+        Color labelColor = locked ? C_ACCENT_RED : C_ACCENT_GREEN;
         AddWorldLabel(door.transform, labelText,
-            new Vector3(0, labelY, 0), labelColor, 24);
+            new Vector3(0, labelY, 0), labelColor, 22);
 
         return door;
     }
 
-    // ═══════════════════════════════════════════════════
-    //              HELPER: MONSTERS
-    // ═══════════════════════════════════════════════════
     static GameObject CreateMonster(string name, Transform parent, Vector3 localPos,
         string monsterName, Color color, float size, string required, string reward, Color rewardColor)
     {
@@ -739,7 +837,7 @@ public class RecursionDungeonSetup : EditorWindow
         monster.transform.localScale = Vector3.one * size;
 
         SpriteRenderer sr = monster.AddComponent<SpriteRenderer>();
-        sr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
+        sr.sprite = Circle();
         sr.color = color;
         sr.sortingOrder = 5;
 
@@ -753,32 +851,22 @@ public class RecursionDungeonSetup : EditorWindow
         mc.rewardWeaponName = reward;
         mc.rewardWeaponColor = rewardColor;
 
-        // Glow ring behind monster
         GameObject glow = new GameObject("GlowRing");
         glow.transform.SetParent(monster.transform);
         glow.transform.localPosition = Vector3.zero;
-        glow.transform.localScale = Vector3.one * 1.4f;
+        glow.transform.localScale = Vector3.one * 1.5f;
         SpriteRenderer glowSR = glow.AddComponent<SpriteRenderer>();
-        glowSR.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
-        Color glowColor = color;
-        glowColor.a = 0.25f;
-        glowSR.color = glowColor;
+        glowSR.sprite = Circle();
+        Color gc = color; gc.a = 0.28f; glowSR.color = gc;
         glowSR.sortingOrder = 4;
 
-        // Monster name label
         AddWorldLabel(monster.transform, monsterName,
-            new Vector3(0, 0.8f, 0), Color.white, 30);
-
-        // "Needs X" label
-        AddWorldLabel(monster.transform, $"needs: {required}",
-            new Vector3(0, -0.8f, 0), new Color(1f, 0.7f, 0.3f), 22);
-
+            new Vector3(0, 0.85f, 0), Color.white, 28);
+        AddWorldLabel(monster.transform, $"NEEDS: {required}",
+            new Vector3(0, -0.85f, 0), C_ACCENT_YELLOW, 20);
         return monster;
     }
 
-    // ═══════════════════════════════════════════════════
-    //              HELPER: ITEMS
-    // ═══════════════════════════════════════════════════
     static GameObject CreateItem(string name, Transform parent, Vector3 localPos,
         string weaponName, Color color, float size)
     {
@@ -788,7 +876,7 @@ public class RecursionDungeonSetup : EditorWindow
         item.transform.localScale = Vector3.one * size;
 
         SpriteRenderer sr = item.AddComponent<SpriteRenderer>();
-        sr.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
+        sr.sprite = Circle();
         sr.color = color;
         sr.sortingOrder = 5;
 
@@ -800,65 +888,22 @@ public class RecursionDungeonSetup : EditorWindow
         itemComp.weaponName = weaponName;
         itemComp.weaponColor = color;
 
-        // Glow
         GameObject glow = new GameObject("Glow");
         glow.transform.SetParent(item.transform);
         glow.transform.localPosition = Vector3.zero;
         glow.transform.localScale = Vector3.one * 1.6f;
         SpriteRenderer glowSR = glow.AddComponent<SpriteRenderer>();
-        glowSR.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
-        Color gc = color; gc.a = 0.2f;
-        glowSR.color = gc;
+        glowSR.sprite = Circle();
+        Color gc = color; gc.a = 0.25f; glowSR.color = gc;
         glowSR.sortingOrder = 4;
 
         AddWorldLabel(item.transform, weaponName,
-            new Vector3(0, -0.9f, 0), new Color(1f, 1f, 0.6f), 26);
-
+            new Vector3(0, -0.9f, 0), C_ACCENT_YELLOW, 26);
         return item;
     }
 
     // ═══════════════════════════════════════════════════
-    //          HELPER: CALL STACK FRAME PREFAB
-    // ═══════════════════════════════════════════════════
-    static GameObject CreateCallStackFramePrefab(Transform parent)
-    {
-        GameObject frame = new GameObject("FramePrefab");
-        frame.transform.SetParent(parent, false);
-
-        RectTransform rt = frame.AddComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(284, 70);
-
-        Image bg = frame.AddComponent<Image>();
-        bg.color = new Color(0.12f, 0.12f, 0.22f, 0.92f);
-
-        LayoutElement le = frame.AddComponent<LayoutElement>();
-        le.preferredHeight = 70;
-        le.minHeight = 70;
-
-        Outline outline = frame.AddComponent<Outline>();
-        outline.effectColor = new Color(0.3f, 0.3f, 0.6f, 0.5f);
-        outline.effectDistance = new Vector2(1, 1);
-
-        GameObject textObj = new GameObject("FrameText");
-        textObj.transform.SetParent(frame.transform, false);
-        RectTransform textRT = textObj.AddComponent<RectTransform>();
-        textRT.anchorMin = Vector2.zero; textRT.anchorMax = Vector2.one;
-        textRT.offsetMin = new Vector2(10, 5); textRT.offsetMax = new Vector2(-10, -5);
-
-        Text text = textObj.AddComponent<Text>();
-        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        text.fontSize = 14;
-        text.color = Color.white;
-        text.alignment = TextAnchor.MiddleLeft;
-        text.horizontalOverflow = HorizontalWrapMode.Wrap;
-        text.verticalOverflow = VerticalWrapMode.Truncate;
-        text.lineSpacing = 1.1f;
-
-        return frame;
-    }
-
-    // ═══════════════════════════════════════════════════
-    //              UI HELPERS
+    //              PIXEL-STYLE UI HELPERS
     // ═══════════════════════════════════════════════════
     static void StretchFull(GameObject go)
     {
@@ -867,23 +912,71 @@ public class RecursionDungeonSetup : EditorWindow
         rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
     }
 
-    static GameObject CreateUIPanel(string name, Transform parent, Vector2 anchorMin,
-        Vector2 anchorMax, Vector2 anchoredPos, Vector2 size, Color color)
+    /// <summary>Creates a panel with a thick pixel-style border (inner body + outer frame).</summary>
+    static GameObject CreatePixelPanel(string name, Transform parent, Vector2 anchor,
+        Vector2 anchoredPos, Vector2 size, Color bodyColor, Color borderColor)
     {
-        GameObject go = new GameObject(name);
-        go.transform.SetParent(parent, false);
-        RectTransform rt = go.AddComponent<RectTransform>();
-        rt.anchorMin = anchorMin; rt.anchorMax = anchorMax;
+        GameObject outer = new GameObject(name);
+        outer.transform.SetParent(parent, false);
+        RectTransform rt = outer.AddComponent<RectTransform>();
+        rt.anchorMin = anchor; rt.anchorMax = anchor;
         rt.anchoredPosition = anchoredPos;
         rt.sizeDelta = size;
-        rt.pivot = anchorMin;
-        Image img = go.AddComponent<Image>();
-        img.color = color;
-        return go;
+        rt.pivot = anchor;
+
+        Image outerImg = outer.AddComponent<Image>();
+        outerImg.color = borderColor;
+
+        // Inner body (slightly smaller)
+        GameObject inner = new GameObject("Body");
+        inner.transform.SetParent(outer.transform, false);
+        RectTransform innerRT = inner.AddComponent<RectTransform>();
+        innerRT.anchorMin = Vector2.zero; innerRT.anchorMax = Vector2.one;
+        innerRT.offsetMin = new Vector2(4, 4); innerRT.offsetMax = new Vector2(-4, -4);
+        Image innerImg = inner.AddComponent<Image>();
+        innerImg.color = bodyColor;
+
+        // Corner "pixel" accents for retro feel
+        AddCornerPixel(outer, borderColor, new Vector2(0, 0), new Vector2(10, 0));  // BL
+        AddCornerPixel(outer, borderColor, new Vector2(1, 0), new Vector2(-10, 0));  // BR
+        AddCornerPixel(outer, borderColor, new Vector2(0, 1), new Vector2(10, 0));   // TL
+        AddCornerPixel(outer, borderColor, new Vector2(1, 1), new Vector2(-10, 0));  // TR
+
+        return outer;
     }
 
-    static GameObject CreateUIText(string name, Transform parent, string content,
-        int fontSize, TextAnchor alignment, Vector2 anchoredPos, Vector2 size)
+    static void AddCornerPixel(GameObject parent, Color color, Vector2 anchor, Vector2 offset)
+    {
+        GameObject corner = new GameObject("CornerPx");
+        corner.transform.SetParent(parent.transform, false);
+        RectTransform rt = corner.AddComponent<RectTransform>();
+        rt.anchorMin = anchor; rt.anchorMax = anchor;
+        rt.pivot = anchor;
+        rt.anchoredPosition = offset;
+        rt.sizeDelta = new Vector2(6, 6);
+        Image img = corner.AddComponent<Image>();
+        img.color = color;
+        img.raycastTarget = false;
+    }
+
+    /// <summary>Adds a thick border around an existing UI image.</summary>
+    static void AddPixelBorder(GameObject parent, Color borderColor, int thickness)
+    {
+        GameObject border = new GameObject("Border");
+        border.transform.SetParent(parent.transform, false);
+        border.transform.SetAsFirstSibling();
+        RectTransform rt = border.AddComponent<RectTransform>();
+        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
+        rt.offsetMin = new Vector2(-thickness, -thickness);
+        rt.offsetMax = new Vector2(thickness, thickness);
+        Image img = border.AddComponent<Image>();
+        img.color = borderColor;
+        img.raycastTarget = false;
+    }
+
+    /// <summary>Pixel-style text: bold, with shadow + outline for retro feel.</summary>
+    static GameObject CreatePixelText(string name, Transform parent, string content,
+        int fontSize, TextAnchor alignment, Vector2 anchoredPos, Vector2 size, Color color)
     {
         GameObject go = new GameObject(name);
         go.transform.SetParent(parent, false);
@@ -894,8 +987,21 @@ public class RecursionDungeonSetup : EditorWindow
         text.text = content;
         text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         text.fontSize = fontSize;
-        text.color = Color.white;
+        text.fontStyle = FontStyle.Bold;
+        text.color = color;
         text.alignment = alignment;
+        text.raycastTarget = false;
+
+        // Shadow for retro pixel feel
+        Shadow shadow = go.AddComponent<Shadow>();
+        shadow.effectColor = C_TEXT_SHADOW;
+        shadow.effectDistance = new Vector2(3, -3);
+
+        // Outline to simulate pixel chunkiness
+        Outline outline = go.AddComponent<Outline>();
+        outline.effectColor = new Color(0f, 0f, 0f, 0.85f);
+        outline.effectDistance = new Vector2(1.5f, 1.5f);
+
         return go;
     }
 
@@ -909,41 +1015,126 @@ public class RecursionDungeonSetup : EditorWindow
         return go;
     }
 
-    static GameObject CreateUIButton(string name, Transform parent, string label,
-        Vector2 anchoredPos, Vector2 size, Color bgColor)
+    /// <summary>Chunky retro button with thick border and color accent.</summary>
+    static GameObject CreatePixelButton(string name, Transform parent, string label,
+        Vector2 anchoredPos, Vector2 size, Color bodyColor, Color borderColor)
     {
-        GameObject go = new GameObject(name);
-        go.transform.SetParent(parent, false);
-        RectTransform rt = go.AddComponent<RectTransform>();
+        GameObject outer = new GameObject(name);
+        outer.transform.SetParent(parent, false);
+        RectTransform rt = outer.AddComponent<RectTransform>();
         rt.anchoredPosition = anchoredPos;
         rt.sizeDelta = size;
 
-        Image img = go.AddComponent<Image>();
-        img.color = bgColor;
+        Image outerImg = outer.AddComponent<Image>();
+        outerImg.color = borderColor;
 
-        Outline ol = go.AddComponent<Outline>();
-        ol.effectColor = Color.white * 0.3f;
-        ol.effectDistance = new Vector2(1, 1);
-
-        Button btn = go.AddComponent<Button>();
+        Button btn = outer.AddComponent<Button>();
         ColorBlock cb = btn.colors;
-        cb.highlightedColor = bgColor * 1.4f;
-        cb.pressedColor = bgColor * 0.6f;
+        cb.normalColor = Color.white;
+        cb.highlightedColor = new Color(1.1f, 1.1f, 1.1f);
+        cb.pressedColor = new Color(0.7f, 0.7f, 0.7f);
+        cb.selectedColor = Color.white;
         btn.colors = cb;
+        btn.targetGraphic = outerImg;
 
+        // Inner body
+        GameObject inner = new GameObject("Body");
+        inner.transform.SetParent(outer.transform, false);
+        RectTransform innerRT = inner.AddComponent<RectTransform>();
+        innerRT.anchorMin = Vector2.zero; innerRT.anchorMax = Vector2.one;
+        innerRT.offsetMin = new Vector2(4, 4); innerRT.offsetMax = new Vector2(-4, -4);
+        Image innerImg = inner.AddComponent<Image>();
+        innerImg.color = bodyColor;
+        innerImg.raycastTarget = false;
+
+        // Highlight stripe (top)
+        GameObject highlight = new GameObject("Highlight");
+        highlight.transform.SetParent(outer.transform, false);
+        RectTransform hRT = highlight.AddComponent<RectTransform>();
+        hRT.anchorMin = new Vector2(0, 1); hRT.anchorMax = new Vector2(1, 1);
+        hRT.pivot = new Vector2(0.5f, 1);
+        hRT.offsetMin = new Vector2(4, -10); hRT.offsetMax = new Vector2(-4, -4);
+        Image hImg = highlight.AddComponent<Image>();
+        hImg.color = new Color(1f, 1f, 1f, 0.15f);
+        hImg.raycastTarget = false;
+
+        // Text
         GameObject textObj = new GameObject("Text");
-        textObj.transform.SetParent(go.transform, false);
+        textObj.transform.SetParent(outer.transform, false);
         RectTransform textRT = textObj.AddComponent<RectTransform>();
         textRT.anchorMin = Vector2.zero; textRT.anchorMax = Vector2.one;
         textRT.offsetMin = Vector2.zero; textRT.offsetMax = Vector2.zero;
-
         Text text = textObj.AddComponent<Text>();
         text.text = label;
         text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        text.fontSize = 20;
+        text.fontSize = 24;
+        text.fontStyle = FontStyle.Bold;
         text.color = Color.white;
         text.alignment = TextAnchor.MiddleCenter;
+        text.raycastTarget = false;
 
-        return go;
+        Shadow sh = textObj.AddComponent<Shadow>();
+        sh.effectColor = new Color(0, 0, 0, 0.9f);
+        sh.effectDistance = new Vector2(2, -2);
+
+        return outer;
+    }
+
+    static GameObject CreateCallStackFrame(Transform parent)
+    {
+        GameObject frame = new GameObject("FramePrefab");
+        frame.transform.SetParent(parent, false);
+        RectTransform rt = frame.AddComponent<RectTransform>();
+        rt.sizeDelta = new Vector2(300, 75);
+
+        Image bg = frame.AddComponent<Image>();
+        bg.color = new Color(0.15f, 0.10f, 0.25f, 0.95f);
+
+        LayoutElement le = frame.AddComponent<LayoutElement>();
+        le.preferredHeight = 75; le.minHeight = 75;
+
+        // Body (inner)
+        GameObject body = new GameObject("Body");
+        body.transform.SetParent(frame.transform, false);
+        RectTransform bodyRT = body.AddComponent<RectTransform>();
+        bodyRT.anchorMin = Vector2.zero; bodyRT.anchorMax = Vector2.one;
+        bodyRT.offsetMin = new Vector2(3, 3); bodyRT.offsetMax = new Vector2(-3, -3);
+        Image bodyImg = body.AddComponent<Image>();
+        bodyImg.color = new Color(0.07f, 0.04f, 0.15f, 0.95f);
+        bodyImg.raycastTarget = false;
+
+        // Depth badge (left)
+        GameObject badge = new GameObject("DepthBadge");
+        badge.transform.SetParent(body.transform, false);
+        RectTransform bRT = badge.AddComponent<RectTransform>();
+        bRT.anchorMin = new Vector2(0, 0); bRT.anchorMax = new Vector2(0, 1);
+        bRT.pivot = new Vector2(0, 0.5f);
+        bRT.offsetMin = new Vector2(4, 4); bRT.offsetMax = new Vector2(44, -4);
+        Image badgeImg = badge.AddComponent<Image>();
+        badgeImg.color = C_ACCENT_PINK;
+        badgeImg.raycastTarget = false;
+
+        // Text
+        GameObject textObj = new GameObject("FrameText");
+        textObj.transform.SetParent(body.transform, false);
+        RectTransform textRT = textObj.AddComponent<RectTransform>();
+        textRT.anchorMin = Vector2.zero; textRT.anchorMax = Vector2.one;
+        textRT.offsetMin = new Vector2(52, 6); textRT.offsetMax = new Vector2(-8, -6);
+        Text text = textObj.AddComponent<Text>();
+        text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        text.fontSize = 14;
+        text.fontStyle = FontStyle.Bold;
+        text.color = Color.white;
+        text.alignment = TextAnchor.MiddleLeft;
+        text.horizontalOverflow = HorizontalWrapMode.Wrap;
+        text.verticalOverflow = VerticalWrapMode.Truncate;
+        text.lineSpacing = 1.2f;
+        text.raycastTarget = false;
+
+        Shadow sh = textObj.AddComponent<Shadow>();
+        sh.effectColor = new Color(0, 0, 0, 0.9f);
+        sh.effectDistance = new Vector2(2, -2);
+
+        return frame;
     }
 }

@@ -54,6 +54,15 @@ public class UIManager : MonoBehaviour
         {
             timerText.text = GameManager.Instance.GetFormattedTime();
         }
+
+        // Keyboard shortcuts on the Victory screen, in case mouse input doesn't work
+        if (victoryPanel != null && victoryPanel.activeSelf)
+        {
+            if (Input.GetKeyDown(KeyCode.R) || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return))
+                OnPlayAgain();
+            else if (Input.GetKeyDown(KeyCode.M) || Input.GetKeyDown(KeyCode.Escape))
+                OnMainMenu();
+        }
     }
 
     public void UpdateRoomDisplay(int depth, string roomName)
@@ -97,7 +106,7 @@ public class UIManager : MonoBehaviour
             {
                 int minutes = Mathf.FloorToInt(time / 60f);
                 int seconds = Mathf.FloorToInt(time % 60f);
-                victoryTimeText.text = $"You Escaped the Dungeon!\nTime: {minutes:00}:{seconds:00}";
+                victoryTimeText.text = $"TIME: {minutes:00}:{seconds:00}";
             }
         }
     }

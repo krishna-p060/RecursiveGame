@@ -32,14 +32,55 @@ public class CallStackUI : MonoBehaviour
 
         GameObject frame = Instantiate(framePrefab, stackContainer);
         frame.name = $"Frame_Depth{depth}";
+        frame.SetActive(true);
 
-        Text frameText = frame.GetComponentInChildren<Text>();
-        if (frameText != null)
+        // Find the main text (the one that says "FrameText")
+        Text[] allTexts = frame.GetComponentsInChildren<Text>(true);
+        foreach (var t in allTexts)
         {
-            if (string.IsNullOrEmpty(monsterName))
-                frameText.text = $"  Room {depth}: {roomName}\n  BASE CASE - Pick up item";
-            else
-                frameText.text = $"  Room {depth}: {roomName}\n  {monsterName} — needs {requiredWeapon}";
+            if (t.gameObject.name == "FrameText")
+            {
+                if (string.IsNullOrEmpty(monsterName))
+                    t.text = $"ROOM {depth}: {roomName}\n<BASE CASE>";
+                else
+                    t.text = $"ROOM {depth}: {roomName}\n{monsterName} needs\n{requiredWeapon}";
+            }
+        }
+
+        // Set depth badge color based on depth
+        Transform badge = frame.transform.Find("Body/DepthBadge");
+        if (badge != null)
+        {
+            Image badgeImg = badge.GetComponent<Image>();
+            if (badgeImg != null)
+            {
+                Color[] depthColors = {
+                    new Color(1f, 0.25f, 0.3f),
+                    new Color(1f, 0.6f, 0.1f),
+                    new Color(0.7f, 0.3f, 1f),
+                    new Color(0.3f, 1f, 0.5f)
+                };
+                if (depth >= 0 && depth < depthColors.Length)
+                    badgeImg.color = depthColors[depth];
+
+                // Add depth number text to badge
+                if (badge.Find("BadgeText") == null)
+                {
+                    GameObject bt = new GameObject("BadgeText");
+                    bt.transform.SetParent(badge, false);
+                    RectTransform btRT = bt.AddComponent<RectTransform>();
+                    btRT.anchorMin = Vector2.zero; btRT.anchorMax = Vector2.one;
+                    btRT.offsetMin = Vector2.zero; btRT.offsetMax = Vector2.zero;
+                    Text btText = bt.AddComponent<Text>();
+                    btText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                    btText.fontSize = 22;
+                    btText.fontStyle = FontStyle.Bold;
+                    btText.color = Color.white;
+                    btText.alignment = TextAnchor.MiddleCenter;
+                    btText.text = depth.ToString();
+                    btText.raycastTarget = false;
+                }
+            }
         }
 
         bool isBaseCase = string.IsNullOrEmpty(monsterName);
@@ -48,7 +89,6 @@ public class CallStackUI : MonoBehaviour
             bg.color = isBaseCase ? baseCaseColor : normalFrameColor;
 
         frameObjects.Add(frame);
-
         AnimateFrameIn(frame);
     }
 
