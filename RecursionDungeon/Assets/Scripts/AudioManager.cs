@@ -16,7 +16,8 @@ public class AudioManager : MonoBehaviour
     [Header("Mixing")]
     [Range(0f, 1f)] public float sfxVolume = 0.8f;
 
-    private AudioSource source;
+    private AudioSource source;      // general-purpose PlayOneShot source
+    private AudioSource tickSource;  // dedicated source used only for bomb ticks (so we can stop them)
 
     // Well-known SFX names — keep these in sync with filenames in Resources/Audio/SFX/.
     public const string SFX_WEAPON_PICKUP = "weapon_pickup";
@@ -30,11 +31,15 @@ public class AudioManager : MonoBehaviour
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
 
-        source = GetComponent<AudioSource>();
-        if (source == null) source = gameObject.AddComponent<AudioSource>();
+        source = gameObject.AddComponent<AudioSource>();
         source.playOnAwake = false;
         source.loop = false;
         source.spatialBlend = 0f; // 2D
+
+        tickSource = gameObject.AddComponent<AudioSource>();
+        tickSource.playOnAwake = false;
+        tickSource.loop = false;
+        tickSource.spatialBlend = 0f;
     }
 
     /// <summary>Plays a one-shot SFX by filename (without extension).</summary>
@@ -44,5 +49,22 @@ public class AudioManager : MonoBehaviour
         AudioClip clip = Resources.Load<AudioClip>("Audio/SFX/" + clipName);
         if (clip == null) return; // SFX file not present — fine, just stay silent.
         source.PlayOneShot(clip, sfxVolume * volumeScale);
+    }
+
+    /// <summary>Plays the bomb tick on its own source so it can be cut off by StopTicks().</summary>
+    public void PlayTick(float volumeScale = 1f)
+    {
+        if (tickSource == null) return;
+        AudioClip clip = Resources.Load<AudioClip>("Audio/SFX/" + SFX_BOMB_TICK);
+        if (clip == null) return;
+        tickSource.clip = clip;
+        tickSource.volume = sfxVolume * volumeScale;
+        tickSource.Play();
+    }
+
+    /// <summary>Immediately stops the current bomb-tick sound (used when the bomb explodes).</summary>
+    public void StopTicks()
+    {
+        if (tickSource != null) tickSource.Stop();
     }
 }

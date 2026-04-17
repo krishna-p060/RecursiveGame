@@ -42,6 +42,7 @@ public class BombTimer : MonoBehaviour
     {
         active = false;
         UIManager.Instance?.HideBombTimer();
+        AudioManager.Instance?.StopTicks();
     }
 
     void Update()
@@ -59,7 +60,7 @@ public class BombTimer : MonoBehaviour
         {
             lastTickedSecond = currentSecond;
             float tickVolume = timeRemaining < 3f ? 1.2f : 0.7f;
-            AudioManager.Instance?.Play(AudioManager.SFX_BOMB_TICK, tickVolume);
+            AudioManager.Instance?.PlayTick(tickVolume);
         }
 
         if (timeRemaining <= 0f)
@@ -74,6 +75,7 @@ public class BombTimer : MonoBehaviour
     {
         UIManager.Instance?.UpdateBombTimer(0f, fuseSeconds);
         UIManager.Instance?.HideBombTimer();
+        AudioManager.Instance?.StopTicks();
         AudioManager.Instance?.Play(AudioManager.SFX_BOMB_EXPLODE, 1.3f);
         GameManager.Instance?.LoseGame("THE BOMB EXPLODED!");
     }
