@@ -44,6 +44,20 @@ public class Monster : MonoBehaviour
         }
     }
 
+    /// <summary>Apply a color multiplier across the body sprite and every child sprite,
+    /// so effects like "flash white" or "fade to red" affect the whole composite monster.</summary>
+    void TintAllRenderers(Color tint)
+    {
+        if (spriteRenderer != null) spriteRenderer.color = tint;
+        foreach (SpriteRenderer child in GetComponentsInChildren<SpriteRenderer>(true))
+        {
+            if (child == spriteRenderer) continue;
+            // Preserve alpha so wing glow (etc.) stays semi-transparent.
+            float a = child.color.a;
+            child.color = new Color(tint.r, tint.g, tint.b, a * tint.a);
+        }
+    }
+
     public void Defeat()
     {
         if (isDead) return;
@@ -59,9 +73,8 @@ public class Monster : MonoBehaviour
         float elapsed = 0f;
         Vector3 startScale = transform.localScale;
 
-        // Flash white first
-        if (spriteRenderer != null)
-            spriteRenderer.color = Color.white;
+        // Flash every sprite white so the whole composite monster flashes.
+        TintAllRenderers(Color.white);
         yield return new WaitForSeconds(0.1f);
 
         while (elapsed < duration)
@@ -69,8 +82,7 @@ public class Monster : MonoBehaviour
             elapsed += Time.deltaTime;
             float t = elapsed / duration;
             transform.localScale = Vector3.Lerp(startScale, Vector3.zero, t);
-            if (spriteRenderer != null)
-                spriteRenderer.color = Color.Lerp(Color.white, new Color(1f, 0f, 0f, 0f), t);
+            TintAllRenderers(Color.Lerp(Color.white, new Color(1f, 0f, 0f, 0f), t));
             transform.Rotate(0, 0, Time.deltaTime * 720f);
             yield return null;
         }
@@ -129,6 +141,9 @@ public class Monster : MonoBehaviour
         Item item = reward.AddComponent<Item>();
         item.weaponName = rewardWeaponName;
         item.weaponColor = rewardWeaponColor;
+
+        // Add the detailed composite weapon visual (blade, guard, handle, flames...)
+        reward.AddComponent<ItemVisual>();
 
         // Name label
         GameObject labelGO = new GameObject("Label");

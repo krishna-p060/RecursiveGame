@@ -123,14 +123,17 @@ public class RecursionDungeonSetup : EditorWindow
         combat.monsterLayer = LayerMask.GetMask("Default");
         combat.attackRange = 1.8f;
 
-        // Direction arrow
+        // Detailed knight/hero visual (helmet, plume, armor, boots) built at runtime.
+        player.AddComponent<PlayerVisual>();
+
+        // Small facing-direction arrow floats above the hero's head.
         GameObject arrow = new GameObject("DirectionArrow");
         arrow.transform.SetParent(player.transform);
-        arrow.transform.localPosition = new Vector3(0, 0.55f, 0);
-        arrow.transform.localScale = new Vector3(0.35f, 0.4f, 1f);
+        arrow.transform.localPosition = new Vector3(0, 0.85f, 0);
+        arrow.transform.localScale = new Vector3(0.25f, 0.25f, 1f);
         SpriteRenderer arrowSR = arrow.AddComponent<SpriteRenderer>();
         arrowSR.sprite = Circle();
-        arrowSR.color = Color.white;
+        arrowSR.color = new Color(1f, 1f, 0.5f, 0.7f);
         arrowSR.sortingOrder = 11;
 
         // Weapon icon
@@ -915,6 +918,9 @@ public class RecursionDungeonSetup : EditorWindow
         mc.rewardWeaponName = reward;
         mc.rewardWeaponColor = rewardColor;
 
+        // Detailed composite art (face, horns, wings, etc.) is built at runtime.
+        monster.AddComponent<MonsterVisual>();
+
         GameObject glow = new GameObject("GlowRing");
         glow.transform.SetParent(monster.transform);
         glow.transform.localPosition = Vector3.zero;
@@ -951,6 +957,9 @@ public class RecursionDungeonSetup : EditorWindow
         Item itemComp = item.AddComponent<Item>();
         itemComp.weaponName = weaponName;
         itemComp.weaponColor = color;
+
+        // Build detailed composite weapon art (blade, guard, handle, flames...) at runtime.
+        item.AddComponent<ItemVisual>();
 
         GameObject glow = new GameObject("Glow");
         glow.transform.SetParent(item.transform);
